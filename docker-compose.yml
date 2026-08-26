@@ -15,6 +15,16 @@ services:
     image: redis:8
     ports:
       - "6379:6379"
+  backend:
+    container_name: rm-backend
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - maven_cache:/root/.m2
 
 volumes:
   postgres_data:
+  maven_cache:
