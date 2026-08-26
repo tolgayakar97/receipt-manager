@@ -109,11 +109,13 @@ Kafka is intentionally not included in the initial Compose setup. It will be int
 - [x] Configure REST API
 - [x] Configure PostgreSQL connection
 - [x] Add JPA / Hibernate dependency
-- [ ] Add Flyway and establish migration-first schema management
-- [ ] Create initial database migration for the User table
-- [ ] Configure Hibernate schema validation (`ddl-auto=validate`)
-- [ ] Create User entity and map it to the migration-managed table
+- [x] Add Flyway and establish migration-first schema management
+- [x] Create initial database migration for the User table
+- [x] Configure Hibernate schema validation (`ddl-auto=validate`)
+- [x] Create User entity and map it to the migration-managed `users` table
 - [ ] Implement basic user APIs
+
+The initial database schema is managed by Flyway. The `V1__create_users_table.sql` migration creates the `users` table, including the generated identity ID, user information, unique email, password and role columns. The `User` JPA entity is mapped to this table, with the `Role` enum stored as a string.
 
 **Schema management rule:** Database tables are not created manually and Hibernate must not create or modify the schema. Flyway migrations are the source of truth for database structure. New schema changes will be introduced through new versioned migrations rather than modifying previous migrations.
 
@@ -200,7 +202,7 @@ This project is also used as a learning project. Features will be implemented in
 
 The immediate development order is:
 
-1. Flyway and migration-first database schema
+1. ~~Flyway and migration-first database schema~~ **Completed**
 2. User entity and persistence layer
 3. Basic user APIs
 4. Spring Security
