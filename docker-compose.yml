@@ -1,7 +1,7 @@
 services:
   db:
     container_name: rm-postgres
-    image: postgres:18
+    image: postgres:17
     ports:
       - "5433:5432"
     environment:
