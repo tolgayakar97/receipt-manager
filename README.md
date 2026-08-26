@@ -107,10 +107,15 @@ Kafka is intentionally not included in the initial Compose setup. It will be int
 
 - [x] Create Spring Boot application
 - [x] Configure REST API
-- [ ] Configure PostgreSQL
-- [ ] Add JPA / Hibernate
-- [ ] Create User entity
+- [x] Configure PostgreSQL connection
+- [x] Add JPA / Hibernate dependency
+- [ ] Add Flyway and establish migration-first schema management
+- [ ] Create initial database migration for the User table
+- [ ] Configure Hibernate schema validation (`ddl-auto=validate`)
+- [ ] Create User entity and map it to the migration-managed table
 - [ ] Implement basic user APIs
+
+**Schema management rule:** Database tables are not created manually and Hibernate must not create or modify the schema. Flyway migrations are the source of truth for database structure. New schema changes will be introduced through new versioned migrations rather than modifying previous migrations.
 
 The Spring Boot application currently runs inside Docker using Maven and Spring Boot DevTools. The backend source directory is bind-mounted into the container, so normal code changes do not require rebuilding the Docker image during development.
 
@@ -182,6 +187,7 @@ Future features may include:
 | Authentication | Spring Security, JWT |
 | Database | PostgreSQL |
 | ORM | Spring Data JPA / Hibernate |
+| Database Migrations | Flyway |
 | OCR Service | Python, FastAPI, PaddleOCR |
 | Frontend | React |
 | Cache | Redis |
@@ -192,4 +198,17 @@ Future features may include:
 
 This project is also used as a learning project. Features will be implemented incrementally rather than building the complete architecture at once.
 
-The initial implementation will focus on the Spring Boot REST API and JWT authentication. The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
+The immediate development order is:
+
+1. Flyway and migration-first database schema
+2. User entity and persistence layer
+3. Basic user APIs
+4. Spring Security
+5. JWT authentication
+6. Receipt management
+7. Python OCR service
+8. React frontend
+9. Redis / Kafka where needed
+10. AI-powered spending analysis
+
+The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
