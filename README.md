@@ -84,23 +84,35 @@ A receipt is planned to contain information such as:
 
 - [x] Create GitHub repository
 - [x] Define initial architecture
-- [ ] Create Docker Compose setup
-- [ ] Dockerize Spring Boot
-- [ ] Dockerize PostgreSQL
-- [ ] Dockerize Redis
+- [x] Create Docker Compose setup
+- [x] Dockerize Spring Boot
+- [x] Dockerize PostgreSQL
+- [x] Dockerize Redis
 - [ ] Dockerize Kafka
 - [ ] Create Python OCR service container
 - [ ] Dockerize React frontend
-- [ ] Configure Docker network and service communication
+- [x] Configure Docker network and service communication
+
+Current development containers:
+
+| Service | Container | Host Port | Container Port |
+|---|---|---:|---:|
+| Spring Boot | `rm-backend` | `8080` | `8080` |
+| PostgreSQL | `rm-postgres` | `5433` | `5432` |
+| Redis | `rm-redis` | `6379` | `6379` |
+
+Kafka is intentionally not included in the initial Compose setup. It will be introduced when asynchronous processing becomes necessary.
 
 ### Phase 1 — Spring Boot Foundation
 
-- [ ] Create Spring Boot application
-- [ ] Configure REST API
+- [x] Create Spring Boot application
+- [x] Configure REST API
 - [ ] Configure PostgreSQL
 - [ ] Add JPA / Hibernate
 - [ ] Create User entity
 - [ ] Implement basic user APIs
+
+The Spring Boot application currently runs inside Docker using Maven and Spring Boot DevTools. The backend source directory is bind-mounted into the container, so normal code changes do not require rebuilding the Docker image during development.
 
 ### Phase 2 — Authentication
 
