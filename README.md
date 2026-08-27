@@ -65,18 +65,17 @@ The first version focuses on a simple and functional receipt management flow:
 
 ### Receipt information
 
-A receipt is planned to contain information such as:
+The current Receipt entity contains:
 
 - Receipt ID
-- User
-- Image reference
-- OCR text
-- Store name
-- Category
-- Amount
-- Purchase date
-- Status
-- Created / updated timestamps
+- Owning user
+- File path reference (the receipt file itself is not stored in the database)
+- Name
+- Description
+- Creation timestamp
+- Soft-delete flag
+
+Additional receipt information such as OCR text, store name, category, amount, purchase date and status will be introduced in later stages.
 
 ## Development Roadmap
 
@@ -114,8 +113,13 @@ Kafka is intentionally not included in the initial Compose setup. It will be int
 - [x] Configure Hibernate schema validation (`ddl-auto=validate`)
 - [x] Create User entity and map it to the migration-managed `users` table
 - [x] Implement user registration
+- [x] Create Receipt entity
+- [x] Create Receipt database migration
+- [x] Define User → Receipt relationship
 
 The initial database schema is managed by Flyway. The `V1__create_users_table.sql` migration creates the `users` table, including the generated identity ID, user information, unique email, password and role columns. The `User` JPA entity is mapped to this table, with the `Role` enum stored as a string.
+
+The Receipt schema is introduced by `V2__create_receipt_table.sql`. It creates the `receipt` table with a generated identity ID, file path, name, optional description, creation timestamp, soft-delete flag, and a non-null foreign key to `users(id)`. The JPA `Receipt` entity models the user relationship as `@ManyToOne` using the `user_id` join column.
 
 **Schema management rule:** Database tables are not created manually and Hibernate must not create or modify the schema. Flyway migrations are the source of truth for database structure. New schema changes will be introduced through new versioned migrations rather than modifying previous migrations.
 
@@ -137,8 +141,6 @@ The authentication flow uses Spring Security's `AuthenticationManager` and a cus
 
 ### Phase 3 — Receipt Management
 
-- [ ] Receipt entity
-- [ ] User → Receipt relationship
 - [ ] Receipt creation
 - [ ] Receipt listing
 - [ ] Receipt detail
@@ -146,6 +148,10 @@ The authentication flow uses Spring Security's `AuthenticationManager` and a cus
 - [ ] Receipt deletion
 - [ ] Receipt status
 - [ ] Image upload / storage
+- [ ] OCR integration
+- [ ] Category and amount information
+
+The initial Receipt entity and User → Receipt relationship are now implemented. Receipt creation, querying, updating, deletion and file handling will be built on top of this model.
 
 ### Phase 4 — OCR Service
 
@@ -212,10 +218,11 @@ The immediate development order is:
 4. ~~Spring Security authentication~~ **Completed**
 5. ~~JWT authentication filter~~ **Completed**
 6. ~~Authenticated request handling and authorization~~ **Completed**
-7. Receipt management
-8. Python OCR service
-9. React frontend
-10. Redis / Kafka where needed
-11. AI-powered spending analysis
+7. ~~Receipt entity and User → Receipt relationship~~ **Completed**
+8. Receipt CRUD and file upload
+9. Python OCR service
+10. React frontend
+11. Redis / Kafka where needed
+12. AI-powered spending analysis
 
 The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
