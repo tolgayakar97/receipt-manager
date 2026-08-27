@@ -4,18 +4,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.tolgayakar.receipt_manager.Model.Role;
-import com.tolgayakar.receipt_manager.Model.User;
+import com.tolgayakar.receipt_manager.Model.RmUser;
 import com.tolgayakar.receipt_manager.Model.DTO.RegisterRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.RegisterResponse;
-import com.tolgayakar.receipt_manager.Repository.UserRepository;
+import com.tolgayakar.receipt_manager.Repository.RmUserRepository;
 
 @Service
 public class RegisterService {
 
     private final PasswordEncoder passwordEncoder;
-    private final UserRepository userRepository;
+    private final RmUserRepository userRepository;
 
-    public RegisterService(PasswordEncoder passwordEncoder, UserRepository userRepository) {
+    public RegisterService(PasswordEncoder passwordEncoder, RmUserRepository userRepository) {
         this.passwordEncoder = passwordEncoder;
         this.userRepository = userRepository;
     }
@@ -27,7 +27,7 @@ public class RegisterService {
         //Passeword encoding.
         String encodedPassword = passwordEncoder.encode(registerRequest.getPassword());
 
-        User user = new User();
+        RmUser user = new RmUser();
         user.setFirstName(registerRequest.getFirstName());
         user.setLastName(registerRequest.getLastName());
         user.setEmail(registerRequest.getEmail());

@@ -12,7 +12,7 @@ public class LoginRequest {
         this.password = password;
     }
 
-    public String getEmai() {
+    public String getEmail() {
         return email;
     }
 
