@@ -113,7 +113,7 @@ Kafka is intentionally not included in the initial Compose setup. It will be int
 - [x] Create initial database migration for the User table
 - [x] Configure Hibernate schema validation (`ddl-auto=validate`)
 - [x] Create User entity and map it to the migration-managed `users` table
-- [ ] Implement basic user APIs
+- [x] Implement user registration
 
 The initial database schema is managed by Flyway. The `V1__create_users_table.sql` migration creates the `users` table, including the generated identity ID, user information, unique email, password and role columns. The `User` JPA entity is mapped to this table, with the `Role` enum stored as a string.
 
@@ -123,13 +123,17 @@ The Spring Boot application currently runs inside Docker using Maven and Spring 
 
 ### Phase 2 — Authentication
 
-- [ ] Password hashing
-- [ ] User registration
-- [ ] Login endpoint
-- [ ] JWT generation
+- [x] Password hashing
+- [x] User registration
+- [x] Login endpoint
+- [x] Authentication with `AuthenticationManager`
+- [x] `UserDetailsService` implementation
+- [x] JWT generation
 - [ ] JWT authentication filter
 - [ ] Authenticated request handling
 - [ ] User-specific authorization
+
+The current authentication flow uses Spring Security's `AuthenticationManager` and a custom `UserDetailsService` to authenticate users by email and password. Successful login generates a signed JWT using JJWT. The current token expiration is 10 minutes.
 
 ### Phase 3 — Receipt Management
 
@@ -186,7 +190,7 @@ Future features may include:
 | Layer | Technology |
 |---|---|
 | Backend | Java, Spring Boot |
-| Authentication | Spring Security, JWT |
+| Authentication | Spring Security, JWT (JJWT) |
 | Database | PostgreSQL |
 | ORM | Spring Data JPA / Hibernate |
 | Database Migrations | Flyway |
@@ -203,14 +207,15 @@ This project is also used as a learning project. Features will be implemented in
 The immediate development order is:
 
 1. ~~Flyway and migration-first database schema~~ **Completed**
-2. User entity and persistence layer
-3. Basic user APIs
-4. Spring Security
-5. JWT authentication
-6. Receipt management
-7. Python OCR service
-8. React frontend
-9. Redis / Kafka where needed
-10. AI-powered spending analysis
+2. ~~User entity and persistence layer~~ **Completed**
+3. ~~User registration~~ **Completed**
+4. ~~Spring Security authentication~~ **Completed**
+5. JWT authentication filter
+6. Authenticated request handling and authorization
+7. Receipt management
+8. Python OCR service
+9. React frontend
+10. Redis / Kafka where needed
+11. AI-powered spending analysis
 
 The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
