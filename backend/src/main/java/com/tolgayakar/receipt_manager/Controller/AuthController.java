@@ -10,6 +10,7 @@ import com.tolgayakar.receipt_manager.Service.RegisterService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -39,7 +40,7 @@ public class AuthController {
     public ResponseEntity<String> login(@RequestBody LoginRequest loginRequest) {
         //TODO: Add email verifier.
         Authentication authentication = loginService.getAuthenticationToken(loginRequest);
-        return ResponseEntity.ok("Login Test");
+        String jwt = loginService.getJwt((UserDetails)authentication.getPrincipal());
+        return ResponseEntity.ok(jwt);
     }
-    
 }

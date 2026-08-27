@@ -26,11 +26,11 @@ public class RmUserDetailsService implements UserDetailsService {
         if(opt.isEmpty()) {
             throw new UsernameNotFoundException("User (" + username + ") not found!");
         }
-        
+
         RmUser rmUser = opt.get();
-            return User.withUsername(rmUser.getEmail())
-                .password(rmUser.getPassword())
-                .roles(rmUser.getRole().name())
-                .build();
+        return User.withUsername(rmUser.getEmail())
+            .password(rmUser.getPassword())
+            .roles(rmUser.getRole().name())
+            .build();
     }
 }

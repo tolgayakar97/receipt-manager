@@ -3,6 +3,7 @@ package com.tolgayakar.receipt_manager.Service;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import com.tolgayakar.receipt_manager.Model.DTO.LoginRequest;
@@ -10,9 +11,11 @@ import com.tolgayakar.receipt_manager.Model.DTO.LoginRequest;
 @Service
 public class LoginService {
     private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
 
-    public LoginService(AuthenticationManager authenticationManager) {
+    public LoginService(AuthenticationManager authenticationManager, JwtService jwtService) {
         this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
     }
 
     public Authentication getAuthenticationToken(LoginRequest loginRequest) {
@@ -26,7 +29,7 @@ public class LoginService {
         return authenticationManager.authenticate(authToken);
     }
 
-    public String getJwt(Authentication authenticationToken) {
-        return "";
+    public String getJwt(UserDetails userDetails) {
+        return jwtService.generateJwt(userDetails);
     }
 }
