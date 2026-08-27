@@ -22,7 +22,7 @@ public class JwtService {
     public String generateJwt(UserDetails userDetails) {
         // Creation time and expiration time are needed.
         Date current = new Date();
-        Date expire = new Date(current.getTime() + 3600000); // Expires after 10 mins (as ms);
+        Date expire = new Date(current.getTime() + 3600000); // Expires after 1 hour as ms;
 
         // JJWT needeed to use Jwts
         return Jwts.builder()
@@ -55,7 +55,7 @@ public class JwtService {
         
         Jws<Claims> claims = parseJwt(jwt);
         //Checks jwt username and userDetails username are same.
-        boolean isSameUsername = extractUsername(jwt).equals(userDetails.getUsername());
+        boolean isSameUsername = claims.getPayload().getSubject().equals(userDetails.getUsername());
         // Expiration control. after checks given date is after or before.
         boolean isExpired = claims.getPayload().getExpiration().after(new Date());
 

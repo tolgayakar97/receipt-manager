@@ -1,6 +1,5 @@
 package com.tolgayakar.receipt_manager.Filter;
 
-import com.tolgayakar.receipt_manager.Repository.RmUserRepository;
 import com.tolgayakar.receipt_manager.Service.JwtService;
 import com.tolgayakar.receipt_manager.Service.RmUserDetailsService;
 
