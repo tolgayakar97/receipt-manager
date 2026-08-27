@@ -11,4 +11,9 @@ public class HelloWorld {
     public String getHelloWorld(@RequestParam(required = false) String param) {
         return "Hello World!";
     }
+
+    @GetMapping("/test/auth")
+    public String getHelloWorldWithAuthorizedUSer(@RequestParam(required = false) String param) {
+        return "Hello world with authorized user";
+    }
 }
