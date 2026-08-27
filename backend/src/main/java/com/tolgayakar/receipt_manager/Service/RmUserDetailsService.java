@@ -23,9 +23,12 @@ public class RmUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // TODO Auto-generated method stub
         Optional<RmUser> opt = userRepository.findByEmail(username);
+        if(opt.isEmpty()) {
+            throw new UsernameNotFoundException("User (" + username + ") not found!");
+        }
+        
         RmUser rmUser = opt.get();
-
-        return User.withUsername(rmUser.getEmail())
+            return User.withUsername(rmUser.getEmail())
                 .password(rmUser.getPassword())
                 .roles(rmUser.getRole().name())
                 .build();
