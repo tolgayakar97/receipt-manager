@@ -129,11 +129,11 @@ The Spring Boot application currently runs inside Docker using Maven and Spring 
 - [x] Authentication with `AuthenticationManager`
 - [x] `UserDetailsService` implementation
 - [x] JWT generation
-- [ ] JWT authentication filter
-- [ ] Authenticated request handling
-- [ ] User-specific authorization
+- [x] JWT authentication filter
+- [x] Authenticated request handling
+- [x] User-specific authorization
 
-The current authentication flow uses Spring Security's `AuthenticationManager` and a custom `UserDetailsService` to authenticate users by email and password. Successful login generates a signed JWT using JJWT. The current token expiration is 10 minutes.
+The authentication flow uses Spring Security's `AuthenticationManager` and a custom `UserDetailsService` to authenticate users by email and password. Successful login generates a signed JWT using JJWT. The token is read from the `Authorization: Bearer <token>` header by a `OncePerRequestFilter`, validated, and used to create an `Authentication` object stored in the `SecurityContext`. Requests without a valid authenticated context are rejected by protected endpoints. The current token expiration is 1 hour.
 
 ### Phase 3 — Receipt Management
 
@@ -210,8 +210,8 @@ The immediate development order is:
 2. ~~User entity and persistence layer~~ **Completed**
 3. ~~User registration~~ **Completed**
 4. ~~Spring Security authentication~~ **Completed**
-5. JWT authentication filter
-6. Authenticated request handling and authorization
+5. ~~JWT authentication filter~~ **Completed**
+6. ~~Authenticated request handling and authorization~~ **Completed**
 7. Receipt management
 8. Python OCR service
 9. React frontend
