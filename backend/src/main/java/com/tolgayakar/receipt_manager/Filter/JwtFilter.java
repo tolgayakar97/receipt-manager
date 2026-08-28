@@ -35,7 +35,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 // In order to authorize, jwt token should be obtained from request.
                 // Jwt token can be obtained from request header in format: Authorization: Bearer <jwt>
                 String auth = request.getHeader("Authorization");
-                System.out.println(auth);
                 
                 //auth cannot be empty and should start with Bearer 
                 if(auth == null || !auth.startsWith("Bearer ")) {
