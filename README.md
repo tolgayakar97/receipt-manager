@@ -142,16 +142,16 @@ The authentication flow uses Spring Security's `AuthenticationManager` and a cus
 
 The token is read from the `Authorization: Bearer <token>` header by a `OncePerRequestFilter`, validated, and used to create an `Authentication` object stored in the `SecurityContext`. Protected endpoints require an authenticated request. The current token expiration is 1 hour.
 
-Authenticated receipt operations resolve the current user from the `SecurityContext` using the email available from `Authentication`. Using the user ID directly in the authenticated principal is planned as a follow-up improvement.
+Authenticated receipt operations currently resolve the current user from the `SecurityContext` using the email available from `Authentication`. Using the user ID directly in the authenticated principal is planned as a follow-up refactoring step after the receipt CRUD flow is completed.
 
 ### Phase 3 — Receipt Management
 
 - [x] Receipt creation
 - [x] Receipt listing
 - [x] Receipt filtering by deletion state
-- [ ] Receipt detail
-- [ ] Receipt update
-- [ ] Receipt deletion
+- [x] Receipt detail
+- [x] Receipt update
+- [x] Receipt deletion (soft delete)
 - [ ] Receipt status
 - [ ] Image upload / storage
 - [ ] OCR integration
@@ -164,7 +164,9 @@ Receipt listing is implemented through `GET /receipts`. The endpoint accepts the
 - `GET /receipts?isDeleted=false` — active receipts
 - `GET /receipts?isDeleted=true` — soft-deleted receipts / trash
 
-The repository query combines the authenticated user's ID with the requested deletion state, ensuring that users only retrieve their own receipts. Results are mapped to `ReceiptResponse` DTOs.
+Receipt detail, update and deletion operations are scoped to the authenticated user. Receipt lookup uses both the receipt ID and the authenticated user's ID, preventing users from accessing or modifying receipts owned by another user.
+
+Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`; a missing receipt or a receipt belonging to another user results in `404 Not Found`.
 
 The current receipt implementation stores a file path reference only. Actual receipt file upload and storage will be introduced later.
 
@@ -237,7 +239,7 @@ The immediate development order is:
 7. ~~Receipt entity and User → Receipt relationship~~ **Completed**
 8. ~~Receipt creation and database-generated creation timestamp~~ **Completed**
 9. ~~Receipt listing and deletion-state filtering~~ **Completed**
-10. Receipt detail / update / delete
+10. ~~Receipt detail / update / delete~~ **Completed**
 11. Receipt image upload / storage
 12. Python OCR service
 13. React frontend
