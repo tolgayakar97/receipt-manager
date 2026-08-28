@@ -2,7 +2,7 @@ package com.tolgayakar.receipt_manager.Model.DTO;
 
 import java.time.Instant;
 
-public class CreateReceiptResponse {
+public class ReceiptResponse {
     private Long id;
     private String filePath;
     private String name;

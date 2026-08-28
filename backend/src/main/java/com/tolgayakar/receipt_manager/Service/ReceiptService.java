@@ -1,5 +1,7 @@
 package com.tolgayakar.receipt_manager.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.security.core.Authentication;
@@ -10,7 +12,7 @@ import org.springframework.stereotype.Service;
 import com.tolgayakar.receipt_manager.Model.Receipt;
 import com.tolgayakar.receipt_manager.Model.RmUser;
 import com.tolgayakar.receipt_manager.Model.DTO.CreateReceiptRequest;
-import com.tolgayakar.receipt_manager.Model.DTO.CreateReceiptResponse;
+import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
 import com.tolgayakar.receipt_manager.Repository.ReceiptRepository;
 import com.tolgayakar.receipt_manager.Repository.RmUserRepository;
 
@@ -24,8 +26,31 @@ public class ReceiptService {
         this.receiptRepository = receiptRepository;
         this.rmUserRepository = rmUserRepository;
     }
+
+    public List<ReceiptResponse> getReceipts(Boolean isDeleted) throws UsernameNotFoundException {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Optional<RmUser> opt = rmUserRepository.findByEmail(auth.getName());
+        if (opt.isEmpty()) {
+            throw new UsernameNotFoundException("Username not found with email: " + auth.getName());
+        }
+
+        List<ReceiptResponse> receiptResponsesList = new ArrayList<>();
+        List<Receipt> receiptsList = receiptRepository.findByUserIdAndIsDeleted(opt.get().getId(), isDeleted);
+
+        for (Receipt receipt : receiptsList) {
+            ReceiptResponse receiptResponse = new ReceiptResponse();
+            receiptResponse.setId(receipt.getId());
+            receiptResponse.setFilePath(receipt.getFilePath());
+            receiptResponse.setName(receipt.getName());
+            receiptResponse.setDescription(receipt.getDescription());
+            receiptResponse.setCreatedAt(receipt.getCreatedAt());
+            receiptResponsesList.add(receiptResponse);
+        }
+
+        return receiptResponsesList;
+    }
     
-    public CreateReceiptResponse createReceipt(CreateReceiptRequest createReceiptRequest) throws UsernameNotFoundException{
+    public ReceiptResponse createReceipt(CreateReceiptRequest createReceiptRequest) throws UsernameNotFoundException{
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         Optional<RmUser> opt = rmUserRepository.findByEmail(auth.getName());
         if(opt.isEmpty()) {
@@ -40,7 +65,7 @@ public class ReceiptService {
         receipt.setUser(opt.get());
         Receipt savedReceipt = receiptRepository.save(receipt);
 
-        CreateReceiptResponse createReceiptResponse = new CreateReceiptResponse();
+        ReceiptResponse createReceiptResponse = new ReceiptResponse();
         createReceiptResponse.setId(savedReceipt.getId());
         createReceiptResponse.setFilePath(savedReceipt.getFilePath());
         createReceiptResponse.setName(savedReceipt.getName());

@@ -3,8 +3,10 @@ package com.tolgayakar.receipt_manager.Controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tolgayakar.receipt_manager.Model.DTO.CreateReceiptRequest;
-import com.tolgayakar.receipt_manager.Model.DTO.CreateReceiptResponse;
+import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
 import com.tolgayakar.receipt_manager.Service.ReceiptService;
+
+import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,14 +25,14 @@ public class ReceiptController {
     }
     
     @GetMapping("/receipts")
-    public String getMethodName(@RequestParam(required = false) String param) {
-        return new String();
+    public ResponseEntity<List<ReceiptResponse>> getReceipts(@RequestParam Boolean isDeleted) {
+        List<ReceiptResponse> receiptsList =  receiptService.getReceipts(isDeleted);
+        return ResponseEntity.ok(receiptsList);
     }
     
     @PostMapping("/receipts")
-    public ResponseEntity<CreateReceiptResponse> createReceipt(@RequestBody CreateReceiptRequest createReceiptRequest) {
-        //TODO: process POST request
-        CreateReceiptResponse createReceiptResponse =  receiptService.createReceipt(createReceiptRequest);
+    public ResponseEntity<ReceiptResponse> createReceipt(@RequestBody CreateReceiptRequest createReceiptRequest) {
+        ReceiptResponse createReceiptResponse =  receiptService.createReceipt(createReceiptRequest);
         // TODO: Call OCR service
         return ResponseEntity.status(HttpStatus.CREATED).body(createReceiptResponse);
     }
