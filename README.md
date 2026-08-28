@@ -1,185 +1,242 @@
 # Receipt Manager
 
-A backend service for managing user receipts. The project is built with Spring Boot and focuses on authentication, authorization, persistence, and user-owned receipt management.
+Receipt Manager is a learning-oriented full-stack receipt management application.
 
-## Current Stack
-
-- Java
-- Spring Boot
-- Spring Web
-- Spring Security
-- JWT authentication
-- Spring Data JPA / Hibernate
-- PostgreSQL
-- Redis
-- Docker / Docker Compose
-- Maven
+The project will allow users to upload receipts, extract text and receipt information with OCR, store the data securely per user, and manage receipts throughout their lifecycle. AI-powered spending analysis will be added in a later phase.
 
 ## Architecture
 
-The backend follows a layered structure:
+The project is designed as a Dockerized multi-service application:
+
+- **Spring Boot** — main REST API, authentication, authorization and receipt management
+- **Python + FastAPI** — OCR service powered by PaddleOCR
+- **React** — frontend application
+- **PostgreSQL** — persistent application data
+- **Redis** — caching / supporting infrastructure
+- **Kafka** — asynchronous event processing
+- **Docker Compose** — local development and service orchestration
+
+### Planned architecture
 
 ```text
-Controller
-    ↓
-Service
-    ↓
-Repository
-    ↓
-PostgreSQL
+                    ┌──────────────┐
+                    │    React     │
+                    │    :3000     │
+                    └──────┬───────┘
+                           │
+                           ▼
+                    ┌──────────────┐
+                    │ Spring Boot  │
+                    │    :8080     │
+                    └──┬────┬──────┘
+                       │    │
+             ┌─────────┘    └──────────┐
+             ▼                         ▼
+      ┌─────────────┐           ┌─────────────┐
+      │ PostgreSQL  │           │    Redis    │
+      └─────────────┘           └─────────────┘
+                                      
+                               ┌─────────────┐
+                               │    Kafka    │
+                               └──────┬──────┘
+                                      │
+                                      ▼
+                               ┌─────────────┐
+                               │ OCR Service │
+                               │ Python +    │
+                               │ PaddleOCR   │
+                               └─────────────┘
 ```
 
-Authentication is handled by Spring Security and JWT. After authentication, the authenticated user is available through the `SecurityContextHolder` during request processing.
+## Current Goal — V1
 
-## Authentication
+The first version focuses on a simple and functional receipt management flow:
 
-The application uses JWT-based authentication.
+1. User registration and login
+2. JWT-based authentication
+3. User-specific receipt access
+4. Receipt image upload
+5. OCR text extraction
+6. Receipt information storage
+7. Receipt CRUD operations
+8. Receipt status management
+9. Basic categories and amount information
+10. Dockerized development environment
 
-The current authentication flow is:
+### Receipt information
 
-```text
-Login
-  ↓
-AuthenticationManager
-  ↓
-UserDetailsService
-  ↓
-JWT generation
-  ↓
-JWT Filter
-  ↓
-SecurityContextHolder
-```
+The current Receipt entity contains:
 
-The authenticated principal currently exposes the user's email. User-specific operations use the authenticated identity rather than accepting a `userId` from the client.
+- Receipt ID
+- Owning user
+- File path reference (the receipt file itself is not stored in the database)
+- Name
+- Description
+- Creation timestamp
+- Soft-delete flag
 
-## Users
+Additional receipt information such as OCR text, store name, category, amount, purchase date and status will be introduced in later stages.
 
-Users are persisted as `RmUser` entities. Each user has:
+## Development Roadmap
 
-- `id`
-- `email`
-- `password`
-- `role`
+### Phase 0 — Infrastructure
 
-Passwords are stored using BCrypt hashing, and roles are represented using an enum.
+- [x] Create GitHub repository
+- [x] Define initial architecture
+- [x] Create Docker Compose setup
+- [x] Dockerize Spring Boot
+- [x] Dockerize PostgreSQL
+- [x] Dockerize Redis
+- [ ] Dockerize Kafka
+- [ ] Create Python OCR service container
+- [ ] Dockerize React frontend
+- [x] Configure Docker network and service communication
 
-## Receipts
+Current development containers:
 
-Receipts belong to a specific user through a `ManyToOne` relationship:
+| Service | Container | Host Port | Container Port |
+|---|---|---:|---:|
+| Spring Boot | `rm-backend` | `8080` | `8080` |
+| PostgreSQL | `rm-postgres` | `5433` | `5432` |
+| Redis | `rm-redis` | `6379` | `6379` |
 
-```text
-User 1 ──────── * Receipt
-```
+PostgreSQL data is persisted using the named `postgres_data` Docker volume mounted to `/var/lib/postgresql/data`. Therefore, `docker compose down` preserves database data, while `docker compose down -v` removes the named volume and its persisted data.
 
-A receipt currently contains:
+Kafka is intentionally not included in the initial Compose setup. It will be introduced when asynchronous processing becomes necessary.
 
-- `id`
-- `filePath`
-- `name`
-- `description`
-- `createdAt`
-- `isDeleted`
-- `user`
+### Phase 1 — Spring Boot Foundation
 
-### Receipt API
+- [x] Create Spring Boot application
+- [x] Configure REST API
+- [x] Configure PostgreSQL connection
+- [x] Add JPA / Hibernate dependency
+- [x] Add Flyway and establish migration-first schema management
+- [x] Create initial database migration for the User table
+- [x] Configure Hibernate schema validation (`ddl-auto=validate`)
+- [x] Create User entity and map it to the migration-managed `users` table
+- [x] Implement user registration
+- [x] Create Receipt entity
+- [x] Create Receipt database migration
+- [x] Define User → Receipt relationship
+- [x] Configure database-generated Receipt creation timestamp
 
-The receipt controller is being built around user-owned resources.
+The initial database schema is managed by Flyway. The `V1__create_users_table.sql` migration creates the `users` table, including the generated identity ID, user information, unique email, password and role columns. The `User` JPA entity is mapped to this table, with the `Role` enum stored as a string.
 
-Planned/current endpoints:
+The Receipt schema is introduced by `V2__create_receipt_table.sql`. It creates the `receipt` table with a generated identity ID, file path, name, optional description, creation timestamp, soft-delete flag, and a non-null foreign key to `users(id)`. The JPA `Receipt` entity models the user relationship as `@ManyToOne` using the `user_id` join column.
 
-```text
-POST /receipts
-GET  /receipts
-```
+The `created_at` column is generated by PostgreSQL with `DEFAULT CURRENT_TIMESTAMP`. Hibernate is configured to treat the value as database-generated on INSERT, so the timestamp is generated by PostgreSQL and populated back into the entity without manually setting it in the service layer.
 
-The authenticated user determines receipt ownership. Clients should not provide another user's ID to create or retrieve receipts.
+**Schema management rule:** Database tables are not created manually and Hibernate must not create or modify the schema. Flyway migrations are the source of truth for database structure. New schema changes will be introduced through new versioned migrations rather than modifying previous migrations.
 
-Receipt filtering will use request query parameters where appropriate. For example:
+The Spring Boot application currently runs inside Docker using Maven and Spring Boot DevTools. The backend source directory is bind-mounted into the container, so normal code changes do not require rebuilding the Docker image during development.
 
-```text
-GET /receipts?isDeleted=false
-```
+### Phase 2 — Authentication
 
-The corresponding repository query can combine the authenticated user's ID with the requested filter so that users only receive their own receipts.
+- [x] Password hashing
+- [x] User registration
+- [x] Login endpoint
+- [x] Authentication with `AuthenticationManager`
+- [x] `UserDetailsService` implementation
+- [x] JWT generation
+- [x] JWT authentication filter
+- [x] Authenticated request handling
+- [x] User-specific authorization
 
-## Database-generated timestamps
+The authentication flow uses Spring Security's `AuthenticationManager` and a custom `UserDetailsService` to authenticate users by email and password. Successful login generates a signed JWT using JJWT. The token is read from the `Authorization: Bearer <token>` header by a `OncePerRequestFilter`, validated, and used to create an `Authentication` object stored in the `SecurityContext`. Requests without a valid authenticated context are rejected by protected endpoints. The current token expiration is 1 hour.
 
-`receipt.created_at` is generated by PostgreSQL:
+Authenticated receipt operations use the user represented by the current `SecurityContext`. The receipt service currently resolves the authenticated user through the email available from `Authentication`; using the user ID directly in the authenticated principal is planned as a follow-up improvement.
 
-```sql
-created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-```
+### Phase 3 — Receipt Management
 
-Hibernate is configured not to insert or update this field directly and is informed that the value is generated on insert. This allows PostgreSQL to generate the timestamp while Hibernate retrieves the generated value for the entity.
+- [x] Receipt creation
+- [ ] Receipt listing
+- [ ] Receipt detail
+- [ ] Receipt update
+- [ ] Receipt deletion
+- [ ] Receipt status
+- [ ] Image upload / storage
+- [ ] OCR integration
+- [ ] Category and amount information
 
-## Docker
+Receipt creation is now implemented through the receipt service. The authenticated user is assigned as the receipt owner, so the client does not provide a user ID when creating a receipt. The initial creation response returns the generated receipt ID, file path, name, description and creation timestamp.
 
-The project runs PostgreSQL, Redis, and the backend using Docker Compose.
+Receipt listing is the next development step. The planned endpoint is `GET /receipts`, with filtering such as `GET /receipts?isDeleted=false`. Repository queries will combine the authenticated user's identity with the requested filters so users only access their own receipts.
 
-PostgreSQL is exposed on host port `5433` and Redis on host port `6379`.
+The current receipt implementation stores a file path reference only. Actual receipt file upload and storage will be introduced later.
 
-PostgreSQL data is persisted through a named Docker volume mounted at PostgreSQL's actual data directory:
+### Phase 4 — OCR Service
 
-```yaml
-volumes:
-  - postgres_data:/var/lib/postgresql/data
-```
+- [ ] Create FastAPI service
+- [ ] Integrate PaddleOCR
+- [ ] Create OCR endpoint
+- [ ] Send receipt image from Spring Boot to OCR service
+- [ ] Process OCR result
+- [ ] Store extracted receipt information
 
-Therefore, running:
+### Phase 5 — React Frontend
 
-```bash
-docker compose down
-```
+- [ ] Create React application
+- [ ] Login / register UI
+- [ ] JWT handling
+- [ ] Receipt upload UI
+- [ ] Receipt list
+- [ ] Receipt detail
+- [ ] Receipt update / delete
 
-does not remove the PostgreSQL data. Using:
+### Phase 6 — Redis & Kafka
 
-```bash
-docker compose down -v
-```
+- [ ] Define Redis use cases
+- [ ] Add caching where useful
+- [ ] Define receipt/OCR events
+- [ ] Introduce asynchronous processing where useful
 
-also removes the named volumes and therefore deletes the persisted database data.
+### Phase 7 — AI Analysis
 
-## Project Structure
+Future features may include:
 
-```text
-receipt-manager/
-├── backend/
-│   ├── src/
-│   ├── Dockerfile
-│   ├── pom.xml
-│   └── mvnw
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+- Spending analysis
+- Category-based spending statistics
+- Monthly spending trends
+- Store-based analysis
+- Most frequently purchased products
+- Unusual spending detection
+- Natural-language spending summaries
 
-## Running the Project
+## Technology Stack
 
-Create the environment configuration from `.env.example`, then start the services with:
+| Layer | Technology |
+|---|---|
+| Backend | Java, Spring Boot |
+| Authentication | Spring Security, JWT (JJWT) |
+| Database | PostgreSQL |
+| ORM | Spring Data JPA / Hibernate |
+| Database Migrations | Flyway |
+| OCR Service | Python, FastAPI, PaddleOCR |
+| Frontend | React |
+| Cache | Redis |
+| Messaging | Apache Kafka |
+| Containerization | Docker, Docker Compose |
 
-```bash
-docker compose up --build
-```
+## Development Approach
 
-The backend is exposed on:
+This project is also used as a learning project. Features will be implemented incrementally rather than building the complete architecture at once.
 
-```text
-http://localhost:8080
-```
+The immediate development order is:
 
-PostgreSQL is exposed to the host on:
+1. ~~Flyway and migration-first database schema~~ **Completed**
+2. ~~User entity and persistence layer~~ **Completed**
+3. ~~User registration~~ **Completed**
+4. ~~Spring Security authentication~~ **Completed**
+5. ~~JWT authentication filter~~ **Completed**
+6. ~~Authenticated request handling and authorization~~ **Completed**
+7. ~~Receipt entity and User → Receipt relationship~~ **Completed**
+8. ~~Receipt creation and database-generated creation timestamp~~ **Completed**
+9. Receipt listing and filtering
+10. Receipt detail / update / delete
+11. Receipt image upload / storage
+12. Python OCR service
+13. React frontend
+14. Redis / Kafka where needed
+15. AI-powered spending analysis
 
-```text
-localhost:5433
-```
-
-Redis is exposed on:
-
-```text
-localhost:6379
-```
-
-## Development Notes
-
-The project is being developed incrementally. Current work is focused on completing receipt CRUD functionality while keeping authentication and ownership enforcement in place. Pagination, richer receipt filtering, and file upload/storage are planned for later stages.
+The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
