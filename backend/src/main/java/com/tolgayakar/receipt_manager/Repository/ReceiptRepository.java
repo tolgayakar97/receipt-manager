@@ -1,6 +1,7 @@
 package com.tolgayakar.receipt_manager.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,5 +14,6 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long> {
      * @param isDeleted is used to filter receipts by provided isDeleted param.
      * @return all receipts as List<Receipt>
      */
-    public List<Receipt> findByUserIdAndIsDeleted(Long userId, Boolean isDeleted);
+    public Optional<List<Receipt>> findByUserIdAndIsDeleted(Long userId, Boolean isDeleted);
+    public Optional<Receipt> findByIdAndUserIdAndIsDeleted(Long id, Long UserId, Boolean isDeleted);
 }

@@ -74,7 +74,7 @@ public class Receipt {
         return createdAt;
     }
 
-    public void isDeleted(Boolean isDeleted) {
+    public void setDeleted(Boolean isDeleted) {
         this.isDeleted = isDeleted;
     }
 

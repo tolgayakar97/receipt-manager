@@ -1,6 +1,6 @@
 package com.tolgayakar.receipt_manager.Model.DTO;
 
-public class CreateReceiptRequest {
+public class ReceiptRequest {
     private String filePath;
     private String name;
     private String description;
