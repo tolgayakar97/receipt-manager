@@ -17,7 +17,7 @@ public class Receipt {
     private String file_path;
     private String name;
     private String description;
-    private Instant create_at;
+    private Instant created_at;
     private Boolean is_deleted;
 
     @ManyToOne
@@ -53,11 +53,11 @@ public class Receipt {
     }
 
     public void setCreatedAt(Instant createAt) {
-        this.create_at = createAt;
+        this.created_at = createAt;
     }
 
-    public Instant getCreateAt() {
-        return create_at;
+    public Instant getCreatedAt() {
+        return created_at;
     }
 
     public void isDeleted(Boolean isDeleted) {
