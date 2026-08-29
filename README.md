@@ -142,7 +142,7 @@ The authentication flow uses Spring Security's `AuthenticationManager` and a cus
 
 The token is read from the `Authorization: Bearer <token>` header by a `OncePerRequestFilter`, validated, and used to create an `Authentication` object stored in the `SecurityContext`. Protected endpoints require an authenticated request. The current token expiration is 1 hour.
 
-Authenticated receipt operations currently resolve the current user from the `SecurityContext` using the email available from `Authentication`. Using the user ID directly in the authenticated principal is planned as a follow-up refactoring step after the receipt CRUD flow is completed.
+Authenticated receipt operations resolve the current user from the `SecurityContext` using the email available from `Authentication`.
 
 ### Phase 3 — Receipt Management
 
@@ -166,9 +166,9 @@ Receipt listing is implemented through `GET /receipts`. The endpoint accepts the
 
 Receipt detail, update and deletion operations are scoped to the authenticated user. Receipt lookup uses both the receipt ID and the authenticated user's ID, preventing users from accessing or modifying receipts owned by another user.
 
-Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`; a missing receipt or a receipt belonging to another user results in `404 Not Found`.
+Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`; a missing receipt or a receipt belonging to another user results in `404 Not Found` once exception handling is introduced.
 
-The current receipt implementation stores a file path reference only. Actual receipt file upload and storage will be introduced later.
+The current receipt creation endpoint already accepts `multipart/form-data` through `ReceiptRequest`, including a `MultipartFile` field. The uploaded file itself is not yet persisted; the current implementation stores a file path reference. Actual receipt file storage is the next step before OCR integration.
 
 ### Phase 4 — OCR Service
 
