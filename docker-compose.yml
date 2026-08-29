@@ -30,6 +30,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
   ocr:
+    platform: linux/amd64
     container_name: rm-ocr
     build:
       context: ./ocr-service

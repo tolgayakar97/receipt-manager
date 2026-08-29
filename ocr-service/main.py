@@ -1,4 +1,14 @@
 from fastapi import FastAPI, UploadFile, File
+from paddleocr import PaddleOCR
+import tempfile
+import os
+
+ocr_engine = PaddleOCR(
+    lang="tr",
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False
+)
 
 app = FastAPI()
 
@@ -8,7 +18,24 @@ def health_check():
 
 @app.post("/ocr")
 async def ocr(file: UploadFile = File(...)):
-    return {
-        "filename": file.filename,
-        "content_type": file.content_type
-    }
+
+    file_contents =  await file.read() # Uploaded file binary content
+
+    file_type = os.path.splitext(file.filename)[1] # Obtain file suffix such as .jpg, .png etc.
+
+    # Creation a temp file from uploaded file with tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_type) as temp_file:
+        temp_file.write(file_contents) # creates temp_file
+        temp_file_path = temp_file.name
+
+        try :
+            result = ocr_engine.predict(temp_file_path)
+            print(f"OCR RESULT: {result[0]['rec_texts']}")
+            #TODO: Send result to the parser
+
+            return {
+                "filename": file.filename
+                # "result": parsed_result
+            }
+        finally:
+            pass
