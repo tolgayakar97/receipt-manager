@@ -36,7 +36,12 @@ services:
       context: ./ocr-service
     ports:
       - "8000:8000"
+    volumes:
+      - ./ocr-service:/app
+      - paddlex_cache:/root/.paddlex
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgres_data:
   maven_cache:
+  paddlex_cache:
