@@ -16,7 +16,7 @@ The project is designed as a Dockerized multi-service application:
 - **Kafka** — asynchronous event processing
 - **Docker Compose** — local development and service orchestration
 
-### Planned architecture
+### Current development architecture
 
 ```text
                     ┌──────────────┐
@@ -34,19 +34,18 @@ The project is designed as a Dockerized multi-service application:
              ▼                         ▼
       ┌─────────────┐           ┌─────────────┐
       │ PostgreSQL  │           │    Redis    │
+      │    :5433    │           │    :6379    │
       └─────────────┘           └─────────────┘
 
-                               ┌─────────────┐
-                               │    Kafka    │
-                               └──────┬──────┘
-                                      │
-                                      ▼
-                               ┌─────────────┐
-                               │ OCR Service │
-                               │ Python +    │
-                               │ PaddleOCR   │
-                               └─────────────┘
+                    ┌──────────────┐
+                    │ OCR Service  │
+                    │ Python +     │
+                    │ PaddleOCR    │
+                    │    :8000     │
+                    └──────────────┘
 ```
+
+Kafka and the React frontend are planned but are not yet part of the active development environment.
 
 ## Current Goal — V1
 
@@ -88,7 +87,7 @@ Additional receipt information such as OCR text, store name, category, amount, p
 - [x] Dockerize PostgreSQL
 - [x] Dockerize Redis
 - [ ] Dockerize Kafka
-- [ ] Create Python OCR service container
+- [x] Create Python OCR service container
 - [ ] Dockerize React frontend
 - [x] Configure Docker network and service communication
 
@@ -99,8 +98,13 @@ Current development containers:
 | Spring Boot | `rm-backend` | `8080` | `8080` |
 | PostgreSQL | `rm-postgres` | `5433` | `5432` |
 | Redis | `rm-redis` | `6379` | `6379` |
+| OCR Service | `rm-ocr` | `8000` | `8000` |
 
 PostgreSQL data is persisted using the named `postgres_data` Docker volume. `docker compose down` preserves database data, while `docker compose down -v` removes the volume and its persisted data.
+
+The OCR service uses a named `paddlex_cache` Docker volume for PaddleX/PaddleOCR model files. This prevents models from being downloaded again whenever the OCR container is recreated. The first startup may download the required models.
+
+During OCR development, `./ocr-service` is mounted into the container and Uvicorn runs with `--reload`, so Python source changes are picked up without rebuilding the Docker image.
 
 Kafka will be introduced when asynchronous processing becomes necessary.
 
@@ -172,12 +176,21 @@ The current receipt creation endpoint already accepts `multipart/form-data` thro
 
 ### Phase 4 — OCR Service
 
-- [ ] Create FastAPI service
-- [ ] Integrate PaddleOCR
-- [ ] Create OCR endpoint
+- [x] Create FastAPI service
+- [x] Integrate PaddleOCR
+- [x] Create OCR endpoint
+- [x] Accept image uploads such as JPEG/PNG
+- [x] Extract raw OCR text through `rec_texts`
+- [x] Dockerize OCR service
+- [x] Configure OCR development hot reload
+- [x] Persist PaddleOCR model cache across container recreation
+- [ ] Parse raw OCR text into structured receipt data
 - [ ] Send receipt image from Spring Boot to OCR service
-- [ ] Process OCR result
-- [ ] Store extracted receipt information
+- [ ] Process and persist parsed receipt information
+
+The OCR service currently accepts an uploaded image, writes it to a temporary file, and passes that file to PaddleOCR. The raw recognized text is available through PaddleOCR's `rec_texts` result field. Parsing into merchant, date, total, items and categories will be implemented next.
+
+The OCR service runs independently on port `8000`. Its `/health` endpoint can be used to verify that the service is running, while `/ocr` accepts a multipart file upload for OCR processing.
 
 ### Phase 5 — React Frontend
 
@@ -240,10 +253,12 @@ The immediate development order is:
 8. ~~Receipt creation and database-generated creation timestamp~~ **Completed**
 9. ~~Receipt listing and deletion-state filtering~~ **Completed**
 10. ~~Receipt detail / update / delete~~ **Completed**
-11. Receipt image upload / storage
-12. Python OCR service
-13. React frontend
-14. Redis / Kafka where needed
-15. AI-powered spending analysis
+11. ~~Python OCR service and PaddleOCR integration~~ **Completed**
+12. Receipt image upload / storage
+13. OCR result parsing
+14. Spring Boot → OCR service integration
+15. React frontend
+16. Redis / Kafka where needed
+17. AI-powered spending analysis
 
 The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
