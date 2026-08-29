@@ -2,7 +2,7 @@
 
 Receipt Manager is a learning-oriented full-stack receipt management application.
 
-The project will allow users to upload receipts, extract text and receipt information with OCR, store the data securely per user, and manage receipts throughout their lifecycle. AI-powered spending analysis will be added in a later phase.
+The project allows users to upload receipts, extract receipt information with OCR, store the data securely per user, and manage receipts throughout their lifecycle. AI-powered spending analysis will be added in a later phase.
 
 ## Architecture
 
@@ -43,11 +43,17 @@ The project is designed as a Dockerized multi-service application:
                     │ PaddleOCR    │
                     │    :8000     │
                     └──────────────┘
+
+                    ┌──────────────┐
+                    │    Kafka     │
+                    │  planned /   │
+                    │  next phase  │
+                    └──────────────┘
 ```
 
-Kafka and the React frontend are planned but are not yet part of the active development environment.
+React and Kafka are planned for the next development stage. Redis is already part of the Docker Compose infrastructure, but its application-level integration is still pending.
 
-## Current Goal — V1
+## Current Goal — V1 MVP
 
 The first version focuses on a simple and functional receipt management flow:
 
@@ -55,26 +61,45 @@ The first version focuses on a simple and functional receipt management flow:
 2. JWT-based authentication
 3. User-specific receipt access
 4. Receipt image upload
-5. OCR text extraction
-6. Receipt information storage
-7. Receipt CRUD operations
-8. Receipt status management
-9. Basic categories and amount information
-10. Dockerized development environment
+5. OCR service integration
+6. Structured receipt data contract
+7. Receipt information storage
+8. Receipt CRUD operations
+9. Redis caching
+10. Kafka-based event processing
+11. React frontend
+12. Dockerized development environment
 
-### Receipt information
+The current development strategy intentionally postpones the OCR parser implementation. The OCR service temporarily returns a mock structured result using the same contract that the future parser will produce. This allows the Spring Boot, database, Redis, Kafka and React layers to be developed and tested end-to-end without blocking on parser implementation.
 
-The current Receipt entity contains:
+### Parsed receipt contract
 
-- Receipt ID
-- Owning user
-- File path reference
-- Name
-- Description
-- Creation timestamp
-- Soft-delete flag
+The temporary mock parser returns the following structure:
 
-Additional receipt information such as OCR text, store name, category, amount, purchase date and status will be introduced in later stages.
+```json
+{
+  "merchantName": "YUNUS MARKET ISLT.TIC.A.Ş.",
+  "receiptNumber": "0039",
+  "purchaseDate": "2026-08-29",
+  "totalAmount": 405.73,
+  "items": [
+    {
+      "name": "CUMHURIYET SUCUK KG",
+      "quantity": 0.244,
+      "unit": "KG",
+      "unitPrice": 1519.80
+    },
+    {
+      "name": "ULKER PETIBOR COKOK",
+      "quantity": 1,
+      "unit": "AD",
+      "unitPrice": 34.90
+    }
+  ]
+}
+```
+
+This contract is consumed by Spring Boot through `ParsedReceipt` and `ReceiptItem` DTOs. When the real parser is implemented, it should produce the same structure so downstream services do not need to change.
 
 ## Development Roadmap
 
@@ -105,8 +130,6 @@ PostgreSQL data is persisted using the named `postgres_data` Docker volume. `doc
 The OCR service uses a named `paddlex_cache` Docker volume for PaddleX/PaddleOCR model files. This prevents models from being downloaded again whenever the OCR container is recreated. The first startup may download the required models.
 
 During OCR development, `./ocr-service` is mounted into the container and Uvicorn runs with `--reload`, so Python source changes are picked up without rebuilding the Docker image.
-
-Kafka will be introduced when asynchronous processing becomes necessary.
 
 ### Phase 1 — Spring Boot Foundation
 
@@ -157,9 +180,10 @@ Authenticated receipt operations resolve the current user from the `SecurityCont
 - [x] Receipt update
 - [x] Receipt deletion (soft delete)
 - [ ] Receipt status
-- [ ] Image upload / storage
-- [ ] OCR integration
-- [ ] Category and amount information
+- [ ] Physical receipt file storage
+- [x] Multipart receipt image upload support
+- [ ] Persist parsed receipt information in the database
+- [ ] Category information
 
 Receipt creation assigns the authenticated user as the receipt owner, so the client does not provide a user ID.
 
@@ -172,7 +196,7 @@ Receipt detail, update and deletion operations are scoped to the authenticated u
 
 Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`; a missing receipt or a receipt belonging to another user results in `404 Not Found` once exception handling is introduced.
 
-The current receipt creation endpoint already accepts `multipart/form-data` through `ReceiptRequest`, including a `MultipartFile` field. The uploaded file itself is not yet persisted; the current implementation stores a file path reference. Actual receipt file storage is the next step before OCR integration.
+The receipt creation endpoint accepts `multipart/form-data` through `ReceiptRequest`, including a `MultipartFile` field. Upload-size configuration is also supported. Physical file storage is intentionally kept as a separate step so the current MVP can focus on the OCR and structured receipt flow.
 
 ### Phase 4 — OCR Service
 
@@ -184,13 +208,17 @@ The current receipt creation endpoint already accepts `multipart/form-data` thro
 - [x] Dockerize OCR service
 - [x] Configure OCR development hot reload
 - [x] Persist PaddleOCR model cache across container recreation
+- [x] Define structured `ParsedReceipt` contract
+- [x] Send receipt image from Spring Boot to OCR service
+- [x] Deserialize parsed receipt data in Spring Boot
 - [ ] Parse raw OCR text into structured receipt data
-- [ ] Send receipt image from Spring Boot to OCR service
-- [ ] Process and persist parsed receipt information
+- [ ] Persist parsed receipt information
 
-The OCR service currently accepts an uploaded image, writes it to a temporary file, and passes that file to PaddleOCR. The raw recognized text is available through PaddleOCR's `rec_texts` result field. Parsing into merchant, date, total, items and categories will be implemented next.
+The OCR service accepts an uploaded image, writes it to a temporary file and is integrated with Spring Boot through the `/ocr` endpoint. The real PaddleOCR `rec_texts` output has been validated with a test receipt.
 
-The OCR service runs independently on port `8000`. Its `/health` endpoint can be used to verify that the service is running, while `/ocr` accepts a multipart file upload for OCR processing.
+The parser implementation is intentionally deferred. The current `/ocr` response simulates the parser output using a fixed `parsedReceipt` object so the rest of the application can be developed against the final data contract.
+
+The Spring Boot OCR client sends the receipt image as `multipart/form-data` and deserializes the response into `OcrResponse`, `ParsedReceipt` and `ReceiptItem` DTOs. The contract currently contains merchant name, receipt number, purchase date, total amount and essential item information.
 
 ### Phase 5 — React Frontend
 
@@ -202,12 +230,16 @@ The OCR service runs independently on port `8000`. Its `/health` endpoint can be
 - [ ] Receipt detail
 - [ ] Receipt update / delete
 - [ ] Trash view
+- [ ] End-to-end MVP flow
 
 ### Phase 6 — Redis & Kafka
 
 - [ ] Define Redis use cases
-- [ ] Add caching where useful
+- [ ] Add receipt caching
+- [ ] Configure Kafka in Docker Compose
 - [ ] Define receipt/OCR events
+- [ ] Implement Kafka producer
+- [ ] Implement Kafka consumer
 - [ ] Introduce asynchronous processing where useful
 
 ### Phase 7 — AI Analysis
@@ -253,12 +285,17 @@ The immediate development order is:
 8. ~~Receipt creation and database-generated creation timestamp~~ **Completed**
 9. ~~Receipt listing and deletion-state filtering~~ **Completed**
 10. ~~Receipt detail / update / delete~~ **Completed**
-11. ~~Python OCR service and PaddleOCR integration~~ **Completed**
-12. Receipt image upload / storage
-13. OCR result parsing
-14. Spring Boot → OCR service integration
-15. React frontend
-16. Redis / Kafka where needed
-17. AI-powered spending analysis
+11. ~~Multipart receipt image upload support~~ **Completed**
+12. ~~Python OCR service and PaddleOCR integration~~ **Completed**
+13. ~~Spring Boot → OCR service integration~~ **Completed**
+14. ~~Structured parsed receipt contract and DTO mapping~~ **Completed (mock parser)**
+15. Receipt physical file storage
+16. Persist parsed receipt information and receipt items
+17. Redis integration
+18. Kafka integration
+19. React frontend
+20. End-to-end MVP flow
+21. Real OCR result parser
+22. AI-powered spending analysis
 
-The Python OCR service, React frontend, Redis, Kafka and AI features will be introduced progressively as the core backend becomes functional.
+The real parser is intentionally placed after the end-to-end MVP milestones. It will replace the mock parser while preserving the existing `ParsedReceipt` contract.
