@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,9 +42,16 @@ public class ReceiptController {
         return ResponseEntity.ok(receiptResponse);
     }
 
+    /**
+     * ReqeustBody annotation is used for getting JSON data from request body.
+     * In order to upload file, Multipart/form-data request is used.
+     * ModelAttribute annotation is used to get multipart/form-data request and bind it to ReceiptRequest DTO.
+     * @param ReceiptRequest
+     * @return
+     */
     @PostMapping("/receipts")
-    public ResponseEntity<ReceiptResponse> createReceipt(@RequestBody ReceiptRequest ReceiptRequest) {
-        ReceiptResponse createReceiptResponse =  receiptService.createReceipt(ReceiptRequest);
+    public ResponseEntity<ReceiptResponse> createReceipt(@ModelAttribute ReceiptRequest receiptRequest) {
+        ReceiptResponse createReceiptResponse =  receiptService.createReceipt(receiptRequest);
         // TODO: Call OCR service
         return ResponseEntity.status(HttpStatus.CREATED).body(createReceiptResponse);
     }
