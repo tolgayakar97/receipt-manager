@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
+import com.tolgayakar.receipt_manager.Service.OcrClient;
 import com.tolgayakar.receipt_manager.Service.ReceiptService;
 
 import java.util.List;
@@ -24,9 +25,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 public class ReceiptController {
 
     private final ReceiptService receiptService;
+    private final OcrClient ocrClient;
 
-    public ReceiptController(ReceiptService receiptService) {
+    public ReceiptController(ReceiptService receiptService, OcrClient ocrClient) {
         this.receiptService = receiptService;
+        this.ocrClient = ocrClient;
     }
     
     @GetMapping("/receipts")
@@ -52,7 +55,6 @@ public class ReceiptController {
     @PostMapping("/receipts")
     public ResponseEntity<ReceiptResponse> createReceipt(@ModelAttribute ReceiptRequest receiptRequest) {
         ReceiptResponse createReceiptResponse =  receiptService.createReceipt(receiptRequest);
-        // TODO: Call OCR service
         return ResponseEntity.status(HttpStatus.CREATED).body(createReceiptResponse);
     }
 

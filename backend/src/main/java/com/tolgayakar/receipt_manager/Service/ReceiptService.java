@@ -9,9 +9,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.tolgayakar.receipt_manager.Model.Receipt;
 import com.tolgayakar.receipt_manager.Model.RmUser;
+import com.tolgayakar.receipt_manager.Model.DTO.OcrResponse;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
 import com.tolgayakar.receipt_manager.Repository.ReceiptRepository;
@@ -22,10 +24,12 @@ public class ReceiptService {
 
     private final ReceiptRepository receiptRepository;
     private final RmUserRepository rmUserRepository;
+    private final OcrClient ocrClient;
 
-    public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository) {
+    public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository, OcrClient ocrrClient) {
         this.receiptRepository = receiptRepository;
         this.rmUserRepository = rmUserRepository;
+        this.ocrClient = ocrrClient;
     }
 
     public List<ReceiptResponse> getReceipts(Boolean isDeleted) throws UsernameNotFoundException, NoSuchElementException {
@@ -60,13 +64,13 @@ public class ReceiptService {
         return receiptResponse;
     }
     
-    public ReceiptResponse createReceipt(ReceiptRequest createReceiptRequest) throws UsernameNotFoundException {
+    public ReceiptResponse createReceipt(ReceiptRequest receiptRequest) throws UsernameNotFoundException {
         RmUser rmUser = getRmUserFromAuth();
         
         Receipt receipt = new Receipt();
-        receipt.setFilePath(createReceiptRequest.getFilePath());
-        receipt.setName(createReceiptRequest.getName());
-        receipt.setDescription(createReceiptRequest.getDescription());
+        receipt.setFilePath(receiptRequest.getFilePath());
+        receipt.setName(receiptRequest.getName());
+        receipt.setDescription(receiptRequest.getDescription());
         receipt.setDeleted(false);
         receipt.setUser(rmUser);
         Receipt savedReceipt = receiptRepository.save(receipt);
@@ -77,6 +81,8 @@ public class ReceiptService {
         createReceiptResponse.setName(savedReceipt.getName());
         createReceiptResponse.setDescription(savedReceipt.getDescription());
         createReceiptResponse.setCreatedAt(savedReceipt.getCreatedAt());
+
+        performOcr(receiptRequest.getFile());
 
         return createReceiptResponse;
     }
@@ -113,5 +119,15 @@ public class ReceiptService {
             throw new UsernameNotFoundException("Username not found with email: " + auth.getName());
         }
         return opt.get();
+    }
+
+    public void performOcr(MultipartFile file) {
+        try {
+            OcrResponse ocrResponse = ocrClient.process(file);
+            System.out.println("ocrResp filename:" + ocrResponse.getFilename());
+            System.out.println("ocrResp texts: " + ocrResponse.getTexts());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

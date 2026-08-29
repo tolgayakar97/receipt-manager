@@ -30,12 +30,13 @@ async def ocr(file: UploadFile = File(...)):
 
         try :
             result = ocr_engine.predict(temp_file_path)
-            print(f"OCR RESULT: {result[0]['rec_texts']}")
+            rec_texts = result[0]['rec_texts']
+            print(f"OCR RESULT: {rec_texts}")
             #TODO: Send result to the parser
 
             return {
-                "filename": file.filename
-                # "result": parsed_result
+                "filename": file.filename,
+                "texts": rec_texts
             }
         finally:
-            pass
+            os.unlink(temp_file_path)
