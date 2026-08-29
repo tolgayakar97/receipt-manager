@@ -29,14 +29,38 @@ async def ocr(file: UploadFile = File(...)):
         temp_file_path = temp_file.name
 
         try :
-            result = ocr_engine.predict(temp_file_path)
-            rec_texts = result[0]['rec_texts']
-            print(f"OCR RESULT: {rec_texts}")
+            # For now, we return the result as if a parser were present here and the output came from the `ocr.predict` + `parse` operation.
+
+            # result = ocr_engine.predict(temp_file_path)
+            # rec_texts = result[0]['rec_texts']
+            #print(f"OCR RESULT: {rec_texts}")
             #TODO: Send result to the parser
+
+            parsed_receipt = {
+                "merchantName": "YUNUS MARKET ISLT.TIC.A.Ş.",
+                "receiptNumber": "0039",
+                "purchaseDate": "2026-08-29",
+                "totalAmount": 405.73,
+                "items": [
+                    {
+                        "name": "CUMHURIYET SUCUK KG",
+                        "quantity": 0.244,
+                        "unit": "KG",
+                        "unitPrice": 1519.80
+                    },
+                    {
+                        "name": "ULKER PETIBOR COKOK",
+                        "quantity": 1,
+                        "unit": "AD",
+                        "unitPrice": 34.90
+                    }
+                ]
+            }
 
             return {
                 "filename": file.filename,
-                "texts": rec_texts
+                "texts": ["rec_texts"],
+                "parsedReceipt": parsed_receipt
             }
         finally:
             os.unlink(temp_file_path)

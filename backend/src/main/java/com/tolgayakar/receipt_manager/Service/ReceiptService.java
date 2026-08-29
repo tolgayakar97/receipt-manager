@@ -14,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 import com.tolgayakar.receipt_manager.Model.Receipt;
 import com.tolgayakar.receipt_manager.Model.RmUser;
 import com.tolgayakar.receipt_manager.Model.DTO.OcrResponse;
+import com.tolgayakar.receipt_manager.Model.DTO.ParsedReceipt;
+import com.tolgayakar.receipt_manager.Model.DTO.ReceiptItem;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
 import com.tolgayakar.receipt_manager.Repository.ReceiptRepository;
@@ -124,8 +126,19 @@ public class ReceiptService {
     public void performOcr(MultipartFile file) {
         try {
             OcrResponse ocrResponse = ocrClient.process(file);
-            System.out.println("ocrResp filename:" + ocrResponse.getFilename());
-            System.out.println("ocrResp texts: " + ocrResponse.getTexts());
+            ParsedReceipt parsedReceipt = ocrResponse.getParsedReceipt();
+
+            System.out.println("parsedReceipt.getMerchantName(): " + parsedReceipt.getMerchantName());
+            System.out.println("parsedReceipt.getReceiptNumber(): " + parsedReceipt.getReceiptNumber());
+            System.out.println("parsedReceipt.getPurchaseDate(): " + parsedReceipt.getPurchaseDate());
+            System.out.println("parsedReceipt.getTotalAmount(): " + parsedReceipt.getTotalAmount());
+
+            for (ReceiptItem item : parsedReceipt.getItems()) {
+                System.out.println("Item Name: " + item.getName());
+                System.out.println("Item Quantity: " + item.getQuantity());
+                System.out.println("Item Unit: " + item.getUnit());
+                System.out.println("Item Unit Price: " + item.getUnitPrice());
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
