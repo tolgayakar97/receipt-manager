@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,15 +29,31 @@ public class ReceiptService {
     private final ReceiptRepository receiptRepository;
     private final RmUserRepository rmUserRepository;
     private final OcrClient ocrClient;
+    private RedisTemplate<String, List<ReceiptResponse>> redisTemplate;
 
-    public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository, OcrClient ocrrClient) {
+
+    public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository, OcrClient ocrrClient,
+        RedisTemplate<String, List<ReceiptResponse>> redisTemplate
+    ) {
         this.receiptRepository = receiptRepository;
         this.rmUserRepository = rmUserRepository;
         this.ocrClient = ocrrClient;
+        this.redisTemplate = redisTemplate;
     }
 
     public List<ReceiptResponse> getReceipts(Boolean isDeleted) throws UsernameNotFoundException, NoSuchElementException {
         RmUser rmUser = getRmUserFromAuth();
+
+        String cacheKey = "receipts:user:" + rmUser.getId() + ":" + isDeleted;
+
+        List<ReceiptResponse> cachedResponsesList = redisTemplate.opsForValue().get(cacheKey);
+        if(cachedResponsesList != null){
+            System.out.println("TOGI CACHE BULUNDU");
+            return cachedResponsesList;
+        }
+
+        System.out.println("TOGI CACHE MISS");
+        
         List<ReceiptResponse> receiptResponsesList = new ArrayList<>();
         List<Receipt> receiptsList = receiptRepository.findByUserIdAndIsDeleted(rmUser.getId(), isDeleted).orElseThrow();
 
@@ -50,6 +67,7 @@ public class ReceiptService {
             receiptResponsesList.add(receiptResponse);
         }
 
+        redisTemplate.opsForValue().set(cacheKey, receiptResponsesList);
         return receiptResponsesList;
     }
 
