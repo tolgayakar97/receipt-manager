@@ -29,31 +29,33 @@ The project is designed as a Dockerized multi-service application:
                     ┌──────────────┐
                     │ Spring Boot  │
                     │    :8080     │
-                    └──┬────┬──────┘
-                       │    │
-             ┌─────────┘    └──────────┐
-             ▼                         ▼
-      ┌─────────────┐           ┌─────────────┐
-      │ PostgreSQL  │           │    Redis    │
-      │    :5433    │           │    :6379    │
-      └─────────────┘           └─────────────┘
-                                      │
-                                      │ GET /receipts cache
-                                      │
-                    ┌──────────────┐  │
-                    │ OCR Service  │  │
-                    │ Python +     │  │
-                    │ PaddleOCR    │  │
-                    │    :8000     │  │
-                    └──────────────┘  │
-                                      │
-                    ┌──────────────┐  │
-                    │    Kafka     │  │
-                    │    planned   │  │
-                    └──────────────┘  │
+                    └──┬───┬───┬──┘
+                       │   │   │
+             ┌─────────┘   │   └──────────┐
+             ▼             ▼              ▼
+      ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+      │ PostgreSQL  │ │    Redis    │ │    Kafka    │
+      │    :5433    │ │    :6379    │ │    :9092    │
+      └─────────────┘ └─────────────┘ └──────┬──────┘
+                                             │
+                                      receipt-created
+                                             │
+                                             ▼
+                                      Kafka consumer
+
+                    ┌──────────────┐
+                    │ OCR Service  │
+                    │ Python +     │
+                    │ PaddleOCR    │
+                    │    :8000     │
+                    └──────────────┘
 ```
 
-Redis is now integrated into the Spring Boot application. `GET /receipts` uses a user- and deletion-state-specific Redis cache key and returns the cached `ReceiptResponse` list on a cache hit. Kafka and React are the next major integration steps.
+Redis is integrated into the Spring Boot application. `GET /receipts` uses a user- and deletion-state-specific Redis cache key and returns the cached `ReceiptResponse` list on a cache hit.
+
+Kafka is also integrated into the Spring Boot application. Receipt creation publishes a `ReceiptCreatedEvent` to the `receipt-created` topic, and a Kafka listener consumes the event through the `receipt-manager` consumer group. The producer-to-Kafka-to-consumer flow has been verified locally.
+
+React remains the next major integration step.
 
 ## Current Goal — V1 MVP
 
@@ -113,7 +115,7 @@ Spring Boot consumes this contract through `OcrResponse`, `ParsedReceipt` and `R
 - [x] Dockerize Spring Boot
 - [x] Dockerize PostgreSQL
 - [x] Dockerize Redis
-- [ ] Dockerize Kafka
+- [x] Dockerize Kafka
 - [x] Create Python OCR service container
 - [ ] Dockerize React frontend
 - [x] Configure Docker network and service communication
@@ -126,12 +128,15 @@ Current development containers:
 | PostgreSQL | `rm-postgres` | `5433` | `5432` |
 | Redis | `rm-redis` | `6379` | `6379` |
 | OCR Service | `rm-ocr` | `8000` | `8000` |
+| Kafka | `rm-kafka` | `9092` | `9092` |
 
 PostgreSQL data is persisted using the named `postgres_data` Docker volume. `docker compose down` preserves database data, while `docker compose down -v` removes the volume and its persisted data.
 
 The OCR service uses a named `paddlex_cache` Docker volume for PaddleX/PaddleOCR model files. This prevents models from being downloaded again whenever the OCR container is recreated. The first startup may download the required models.
 
 During OCR development, `./ocr-service` is mounted into the container and Uvicorn runs with `--reload`, so Python source changes are picked up without rebuilding the Docker image.
+
+Kafka runs as a single-node KRaft broker/controller using the `apache/kafka` image. The backend connects to it through `kafka:9092` on the Docker network.
 
 ### Phase 1 — Spring Boot Foundation
 
@@ -246,17 +251,30 @@ Redis is available as the `rm-redis` Docker Compose service and is configured in
 
 The application uses a typed `RedisTemplate<String, List<ReceiptResponse>>` with string keys and Jackson JSON serialization for the cached receipt-response list. `GET /receipts` generates a cache key in the form `receipts:user:{userId}:{isDeleted}`. A cache hit returns the cached list directly; a cache miss loads the data from PostgreSQL and stores the result in Redis.
 
-The current Redis implementation intentionally covers the read path first. Cache invalidation for receipt creation, update and soft deletion will be added if needed after the Kafka integration is established.
+The current Redis implementation intentionally covers the read path first. Cache invalidation for receipt creation, update and soft deletion remains a follow-up improvement.
 
 ### Phase 6 — Kafka
 
-- [ ] Add Kafka to Docker Compose
-- [ ] Configure Kafka in Spring Boot
-- [ ] Define receipt/OCR event contract
-- [ ] Implement Kafka producer
-- [ ] Implement Kafka consumer
-- [ ] Introduce asynchronous processing where useful
-- [ ] Verify event flow end-to-end
+- [x] Add Kafka to Docker Compose
+- [x] Configure Kafka in Spring Boot
+- [x] Define receipt/OCR event contract
+- [x] Implement Kafka producer
+- [x] Implement Kafka consumer
+- [x] Introduce asynchronous processing where useful
+- [x] Verify event flow end-to-end
+
+The current Kafka integration uses a `receipt-created` topic with a single partition and replication factor of one for local development. Spring Boot publishes `ReceiptCreatedEvent` messages using `KafkaTemplate` and consumes them with `@KafkaListener` using the `receipt-manager` consumer group.
+
+The event contract currently contains the receipt ID and authenticated user ID:
+
+```json
+{
+  "receiptId": 15,
+  "userId": 1
+}
+```
+
+The producer → Kafka → consumer flow has been verified locally. The consumer receives the published event as `ReceiptCreatedEvent`.
 
 ### Phase 7 — React Frontend
 
@@ -273,10 +291,10 @@ The current Redis implementation intentionally covers the read path first. Cache
 ### Phase 8 — End-to-End MVP
 
 - [ ] Run complete flow from React to Spring Boot
-- [ ] Upload a real receipt image
-- [ ] OCR and mock parsed result
+- [x] Upload a real receipt image
+- [x] OCR and mock parsed result
 - [x] Persist parsed receipt and receipt items
-- [ ] Publish / consume Kafka events
+- [x] Publish / consume Kafka events
 - [x] Use Redis in the application flow
 - [ ] Display persisted receipt data in React
 - [ ] Verify the complete Dockerized flow
@@ -330,7 +348,7 @@ The immediate development order is:
 14. ~~Structured parsed receipt contract and DTO mapping~~ **Completed (mock parser)**
 15. ~~Persist parsed receipt information and receipt items~~ **Completed**
 16. ~~Redis integration for GET /receipts caching~~ **Completed**
-17. Kafka integration
+17. ~~Kafka integration — producer, consumer and verified event flow~~ **Completed**
 18. React frontend
 19. End-to-end MVP flow
 20. Real OCR result parser
