@@ -46,12 +46,11 @@ The project is designed as a Dockerized multi-service application:
 
                     ┌──────────────┐
                     │    Kafka     │
-                    │  planned /   │
-                    │  next phase  │
+                    │    planned   │
                     └──────────────┘
 ```
 
-React and Kafka are planned for the next development stage. Redis is already part of the Docker Compose infrastructure, but its application-level integration is still pending.
+Redis is already part of the Docker Compose infrastructure, but application-level caching is not implemented yet. Kafka and React are the next major integration steps.
 
 ## Current Goal — V1 MVP
 
@@ -63,12 +62,12 @@ The first version focuses on a simple and functional receipt management flow:
 4. Receipt image upload
 5. OCR service integration
 6. Structured receipt data contract
-7. Receipt information storage
+7. Parsed receipt and item persistence
 8. Receipt CRUD operations
 9. Redis caching
 10. Kafka-based event processing
 11. React frontend
-12. Dockerized development environment
+12. End-to-end MVP flow
 
 The current development strategy intentionally postpones the OCR parser implementation. The OCR service temporarily returns a mock structured result using the same contract that the future parser will produce. This allows the Spring Boot, database, Redis, Kafka and React layers to be developed and tested end-to-end without blocking on parser implementation.
 
@@ -99,7 +98,7 @@ The temporary mock parser returns the following structure:
 }
 ```
 
-This contract is consumed by Spring Boot through `ParsedReceipt` and `ReceiptItem` DTOs. When the real parser is implemented, it should produce the same structure so downstream services do not need to change.
+Spring Boot consumes this contract through `OcrResponse`, `ParsedReceipt` and `ReceiptItemDTO`. Parsed items are converted into the `ReceiptItem` entity before persistence. When the real parser is implemented, it should produce the same structure so downstream services do not need to change.
 
 ## Development Roadmap
 
@@ -171,7 +170,7 @@ The token is read from the `Authorization: Bearer <token>` header by a `OncePerR
 
 Authenticated receipt operations resolve the current user from the `SecurityContext` using the email available from `Authentication`.
 
-### Phase 3 — Receipt Management
+### Phase 3 — Receipt Management & Persistence
 
 - [x] Receipt creation
 - [x] Receipt listing
@@ -182,7 +181,8 @@ Authenticated receipt operations resolve the current user from the `SecurityCont
 - [ ] Receipt status
 - [ ] Physical receipt file storage
 - [x] Multipart receipt image upload support
-- [ ] Persist parsed receipt information in the database
+- [x] Persist parsed receipt information in the database
+- [x] Persist receipt items in a separate table
 - [ ] Category information
 
 Receipt creation assigns the authenticated user as the receipt owner, so the client does not provide a user ID.
@@ -194,9 +194,20 @@ Receipt listing is implemented through `GET /receipts`. The endpoint accepts the
 
 Receipt detail, update and deletion operations are scoped to the authenticated user. Receipt lookup uses both the receipt ID and the authenticated user's ID, preventing users from accessing or modifying receipts owned by another user.
 
-Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`; a missing receipt or a receipt belonging to another user results in `404 Not Found` once exception handling is introduced.
+Receipt deletion is implemented as a soft delete by setting the receipt's deletion flag instead of physically removing the database row. Successful deletion returns `204 No Content`.
 
 The receipt creation endpoint accepts `multipart/form-data` through `ReceiptRequest`, including a `MultipartFile` field. Upload-size configuration is also supported. Physical file storage is intentionally kept as a separate step so the current MVP can focus on the OCR and structured receipt flow.
+
+Parsed receipt data is persisted directly onto the `receipt` table using the fields `merchant_name`, `receipt_number`, `purchase_date` and `total_amount`. Individual purchased items are stored in the separate `receipt_item` table with a `receipt_id` foreign key.
+
+The JPA relationship is modeled as `Receipt` → `ReceiptItem` with `@OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true)` and `ReceiptItem` → `Receipt` with `@ManyToOne`. The `Receipt.addReceiptItem(...)` helper keeps both sides of the relationship synchronized.
+
+Database migrations for parsed receipt persistence are:
+
+- `V3__create_receipt_item_table.sql` — creates the `receipt_item` table and its foreign key to `receipt(id)`.
+- `V4__add_ocr_fields_to_receipt.sql` — adds the parsed receipt fields to `receipt`.
+
+The current OCR-to-database flow is validated with a real receipt image and the mock structured parser response.
 
 ### Phase 4 — OCR Service
 
@@ -212,15 +223,35 @@ The receipt creation endpoint accepts `multipart/form-data` through `ReceiptRequ
 - [x] Send receipt image from Spring Boot to OCR service
 - [x] Deserialize parsed receipt data in Spring Boot
 - [ ] Parse raw OCR text into structured receipt data
-- [ ] Persist parsed receipt information
+- [x] Persist parsed receipt information and items
 
 The OCR service accepts an uploaded image, writes it to a temporary file and is integrated with Spring Boot through the `/ocr` endpoint. The real PaddleOCR `rec_texts` output has been validated with a test receipt.
 
 The parser implementation is intentionally deferred. The current `/ocr` response simulates the parser output using a fixed `parsedReceipt` object so the rest of the application can be developed against the final data contract.
 
-The Spring Boot OCR client sends the receipt image as `multipart/form-data` and deserializes the response into `OcrResponse`, `ParsedReceipt` and `ReceiptItem` DTOs. The contract currently contains merchant name, receipt number, purchase date, total amount and essential item information.
+The Spring Boot OCR client sends the receipt image as `multipart/form-data` and deserializes the response into `OcrResponse`, `ParsedReceipt` and `ReceiptItemDTO`. The contract currently contains merchant name, receipt number, purchase date, total amount and essential item information.
 
-### Phase 5 — React Frontend
+### Phase 5 — Redis
+
+- [ ] Define Redis use cases
+- [ ] Configure Spring Data Redis
+- [ ] Add receipt caching
+- [ ] Add cache invalidation/update behavior
+- [ ] Verify cache-backed receipt reads
+
+Redis is already available as the `rm-redis` Docker Compose service. Application-level integration is the next backend task.
+
+### Phase 6 — Kafka
+
+- [ ] Add Kafka to Docker Compose
+- [ ] Configure Kafka in Spring Boot
+- [ ] Define receipt/OCR event contract
+- [ ] Implement Kafka producer
+- [ ] Implement Kafka consumer
+- [ ] Introduce asynchronous processing where useful
+- [ ] Verify event flow end-to-end
+
+### Phase 7 — React Frontend
 
 - [ ] Create React application
 - [ ] Login / register UI
@@ -230,42 +261,43 @@ The Spring Boot OCR client sends the receipt image as `multipart/form-data` and 
 - [ ] Receipt detail
 - [ ] Receipt update / delete
 - [ ] Trash view
-- [ ] End-to-end MVP flow
+- [ ] Connect frontend to backend APIs
 
-### Phase 6 — Redis & Kafka
+### Phase 8 — End-to-End MVP
 
-- [ ] Define Redis use cases
-- [ ] Add receipt caching
-- [ ] Configure Kafka in Docker Compose
-- [ ] Define receipt/OCR events
-- [ ] Implement Kafka producer
-- [ ] Implement Kafka consumer
-- [ ] Introduce asynchronous processing where useful
+- [ ] Run complete flow from React to Spring Boot
+- [ ] Upload a real receipt image
+- [ ] OCR and mock parsed result
+- [x] Persist parsed receipt and receipt items
+- [ ] Publish / consume Kafka events
+- [ ] Use Redis in the application flow
+- [ ] Display persisted receipt data in React
+- [ ] Verify the complete Dockerized flow
 
-### Phase 7 — AI Analysis
+### Phase 9 — Real Parser & AI Analysis
 
-Future features may include:
-
-- Spending analysis
-- Category-based spending statistics
-- Monthly spending trends
-- Store-based analysis
-- Most frequently purchased products
-- Unusual spending detection
-- Natural-language spending summaries
+- [ ] Parse raw OCR text into the existing `ParsedReceipt` contract
+- [ ] Replace the temporary mock parser
+- [ ] Spending analysis
+- [ ] Category-based spending statistics
+- [ ] Monthly spending trends
+- [ ] Store-based analysis
+- [ ] Most frequently purchased products
+- [ ] Unusual spending detection
+- [ ] Natural-language spending summaries
 
 ## Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | Java, Spring Boot |
+| Backend | Java 21, Spring Boot |
 | Authentication | Spring Security, JWT (JJWT) |
-| Database | PostgreSQL |
+| Database | PostgreSQL 17 |
 | ORM | Spring Data JPA / Hibernate |
 | Database Migrations | Flyway |
 | OCR Service | Python, FastAPI, PaddleOCR |
 | Frontend | React |
-| Cache | Redis |
+| Cache | Redis 8 |
 | Messaging | Apache Kafka |
 | Containerization | Docker, Docker Compose |
 
@@ -289,13 +321,12 @@ The immediate development order is:
 12. ~~Python OCR service and PaddleOCR integration~~ **Completed**
 13. ~~Spring Boot → OCR service integration~~ **Completed**
 14. ~~Structured parsed receipt contract and DTO mapping~~ **Completed (mock parser)**
-15. Receipt physical file storage
-16. Persist parsed receipt information and receipt items
-17. Redis integration
-18. Kafka integration
-19. React frontend
-20. End-to-end MVP flow
-21. Real OCR result parser
-22. AI-powered spending analysis
+15. ~~Persist parsed receipt information and receipt items~~ **Completed**
+16. Redis integration
+17. Kafka integration
+18. React frontend
+19. End-to-end MVP flow
+20. Real OCR result parser
+21. AI-powered spending analysis
 
 The real parser is intentionally placed after the end-to-end MVP milestones. It will replace the mock parser while preserving the existing `ParsedReceipt` contract.
