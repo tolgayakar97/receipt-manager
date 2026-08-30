@@ -1,10 +1,15 @@
 package com.tolgayakar.receipt_manager.Model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -12,6 +17,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 
 @Entity
 public class Receipt {
@@ -38,9 +44,40 @@ public class Receipt {
     @Column(name = "is_deleted")
     private Boolean isDeleted;
 
+    @Column(name = "merchant_name")
+    private String merchantName;
+
+    @Column(name = "receipt_number")
+    private String receiptNumber;
+
+    @Column(name = "purchase_date")
+    private LocalDate purchaseDate;
+    
+    @Column(name = "total_amount")
+    private BigDecimal totalAmount;
+
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private RmUser user;
+
+    /**
+ * OneToMany indicates the relation between parent (Receipt) and children (ReceiptItem).
+ *
+ * mappedBy tells JPA that Receipt is not the owning side of the
+ * relationship. The relationship is managed by the "receipt" field
+ * in ReceiptItem.
+ *
+ * cascade tells JPA to propagate persistence operations from Receipt to its ReceiptItems.
+ *
+ * orphanRemoval tells JPA to remove a ReceiptItem from the database
+ * when it is removed from the Receipt's collection.
+ */
+    @OneToMany(
+        mappedBy = "receipt",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
+    )
+    private List<ReceiptItem> receiptItems = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -88,5 +125,42 @@ public class Receipt {
 
     public RmUser getUser() {
         return user;
+    }
+
+    public String getMerchantName() {
+        return merchantName;
+    }
+
+    public void setMerchantName(String merchantName) {
+        this.merchantName = merchantName;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
+    }
+
+    public void setReceiptNumber(String receiptNumber) {
+        this.receiptNumber = receiptNumber;
+    }
+
+    public LocalDate getPurchaseDate() {
+        return purchaseDate;
+    }
+
+    public void setPurchaseDate(LocalDate purchaseDate) {
+        this.purchaseDate = purchaseDate;
+    }
+
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public void addReceiptItem(ReceiptItem receiptItem) {
+        receiptItems.add(receiptItem);
+        receiptItem.setReceipt(this);
     }
 }

@@ -12,10 +12,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tolgayakar.receipt_manager.Model.Receipt;
+import com.tolgayakar.receipt_manager.Model.ReceiptItem;
 import com.tolgayakar.receipt_manager.Model.RmUser;
 import com.tolgayakar.receipt_manager.Model.DTO.OcrResponse;
 import com.tolgayakar.receipt_manager.Model.DTO.ParsedReceipt;
-import com.tolgayakar.receipt_manager.Model.DTO.ReceiptItem;
+import com.tolgayakar.receipt_manager.Model.DTO.ReceiptItemDTO;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
 import com.tolgayakar.receipt_manager.Repository.ReceiptRepository;
@@ -77,16 +78,15 @@ public class ReceiptService {
         receipt.setUser(rmUser);
         Receipt savedReceipt = receiptRepository.save(receipt);
 
-        ReceiptResponse createReceiptResponse = new ReceiptResponse();
-        createReceiptResponse.setId(savedReceipt.getId());
-        createReceiptResponse.setFilePath(savedReceipt.getFilePath());
-        createReceiptResponse.setName(savedReceipt.getName());
-        createReceiptResponse.setDescription(savedReceipt.getDescription());
-        createReceiptResponse.setCreatedAt(savedReceipt.getCreatedAt());
+        ReceiptResponse receiptResponse = new ReceiptResponse();
+        receiptResponse.setId(savedReceipt.getId());
+        receiptResponse.setFilePath(savedReceipt.getFilePath());
+        receiptResponse.setName(savedReceipt.getName());
+        receiptResponse.setDescription(savedReceipt.getDescription());
+        receiptResponse.setCreatedAt(savedReceipt.getCreatedAt());
 
-        performOcr(receiptRequest.getFile());
-
-        return createReceiptResponse;
+        performOcr(receiptRequest.getFile(), savedReceipt);
+        return receiptResponse;
     }
 
     public ReceiptResponse putReceipt(Long id, ReceiptRequest receiptRequest) throws UsernameNotFoundException, NoSuchElementException {
@@ -123,24 +123,32 @@ public class ReceiptService {
         return opt.get();
     }
 
-    public void performOcr(MultipartFile file) {
+    public void performOcr(MultipartFile file, Receipt receipt) {
         try {
             OcrResponse ocrResponse = ocrClient.process(file);
             ParsedReceipt parsedReceipt = ocrResponse.getParsedReceipt();
-
-            System.out.println("parsedReceipt.getMerchantName(): " + parsedReceipt.getMerchantName());
-            System.out.println("parsedReceipt.getReceiptNumber(): " + parsedReceipt.getReceiptNumber());
-            System.out.println("parsedReceipt.getPurchaseDate(): " + parsedReceipt.getPurchaseDate());
-            System.out.println("parsedReceipt.getTotalAmount(): " + parsedReceipt.getTotalAmount());
-
-            for (ReceiptItem item : parsedReceipt.getItems()) {
-                System.out.println("Item Name: " + item.getName());
-                System.out.println("Item Quantity: " + item.getQuantity());
-                System.out.println("Item Unit: " + item.getUnit());
-                System.out.println("Item Unit Price: " + item.getUnitPrice());
-            }
+            persistDb(receipt, parsedReceipt);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void persistDb(Receipt receipt, ParsedReceipt parsedReceipt) {
+        receipt.setMerchantName(parsedReceipt.getMerchantName());
+        receipt.setReceiptNumber(parsedReceipt.getReceiptNumber());
+        receipt.setPurchaseDate(parsedReceipt.getPurchaseDate());
+        receipt.setTotalAmount(parsedReceipt.getTotalAmount());
+
+        for (ReceiptItemDTO receiptItemDto : parsedReceipt.getItems()) {
+            ReceiptItem receiptItem = new ReceiptItem();
+            receiptItem.setName(receiptItemDto.getName());
+            receiptItem.setQuantity(receiptItemDto.getQuantity());
+            receiptItem.setUnit(receiptItemDto.getUnit());
+            receiptItem.setUnitPrice(receiptItemDto.getUnitPrice());
+
+            receipt.addReceiptItem(receiptItem);
+        }
+
+        receiptRepository.save(receipt);
     }
 }

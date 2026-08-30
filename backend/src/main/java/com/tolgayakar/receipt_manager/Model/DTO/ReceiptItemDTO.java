@@ -2,7 +2,7 @@ package com.tolgayakar.receipt_manager.Model.DTO;
 
 import java.math.BigDecimal;
 
-public class ReceiptItem {
+public class ReceiptItemDTO {
     private String name;
     private BigDecimal quantity;
     private String unit;

@@ -9,7 +9,7 @@ public class ParsedReceipt {
     private String receiptNumber;
     private LocalDate purchaseDate;
     private BigDecimal totalAmount;
-    private List<ReceiptItem> items;
+    private List<ReceiptItemDTO> items;
     
     public String getMerchantName() {
         return merchantName;
@@ -35,10 +35,10 @@ public class ParsedReceipt {
     public void setTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
     }
-    public List<ReceiptItem> getItems() {
+    public List<ReceiptItemDTO> getItems() {
         return items;
     }
-    public void setItems(List<ReceiptItem> items) {
+    public void setItems(List<ReceiptItemDTO> items) {
         this.items = items;
     }
 }
