@@ -20,8 +20,10 @@ import com.tolgayakar.receipt_manager.Model.DTO.ParsedReceipt;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptItemDTO;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptRequest;
 import com.tolgayakar.receipt_manager.Model.DTO.ReceiptResponse;
+import com.tolgayakar.receipt_manager.Model.Event.ReceiptCreatedEvent;
 import com.tolgayakar.receipt_manager.Repository.ReceiptRepository;
 import com.tolgayakar.receipt_manager.Repository.RmUserRepository;
+import com.tolgayakar.receipt_manager.Service.Kafka.ReceiptEventProducer;
 
 @Service
 public class ReceiptService {
@@ -29,16 +31,18 @@ public class ReceiptService {
     private final ReceiptRepository receiptRepository;
     private final RmUserRepository rmUserRepository;
     private final OcrClient ocrClient;
-    private RedisTemplate<String, List<ReceiptResponse>> redisTemplate;
+    private final RedisTemplate<String, List<ReceiptResponse>> redisTemplate;
+    private final ReceiptEventProducer receiptEventProducer;
 
 
     public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository, OcrClient ocrrClient,
-        RedisTemplate<String, List<ReceiptResponse>> redisTemplate
+        RedisTemplate<String, List<ReceiptResponse>> redisTemplate, ReceiptEventProducer receiptEventProducer
     ) {
         this.receiptRepository = receiptRepository;
         this.rmUserRepository = rmUserRepository;
         this.ocrClient = ocrrClient;
         this.redisTemplate = redisTemplate;
+        this.receiptEventProducer = receiptEventProducer;
     }
 
     public List<ReceiptResponse> getReceipts(Boolean isDeleted) throws UsernameNotFoundException, NoSuchElementException {
@@ -48,11 +52,8 @@ public class ReceiptService {
 
         List<ReceiptResponse> cachedResponsesList = redisTemplate.opsForValue().get(cacheKey);
         if(cachedResponsesList != null){
-            System.out.println("TOGI CACHE BULUNDU");
             return cachedResponsesList;
         }
-
-        System.out.println("TOGI CACHE MISS");
         
         List<ReceiptResponse> receiptResponsesList = new ArrayList<>();
         List<Receipt> receiptsList = receiptRepository.findByUserIdAndIsDeleted(rmUser.getId(), isDeleted).orElseThrow();
@@ -95,6 +96,8 @@ public class ReceiptService {
         receipt.setDeleted(false);
         receipt.setUser(rmUser);
         Receipt savedReceipt = receiptRepository.save(receipt);
+
+        receiptEventProducer.sendReceiptCreateEvent(new ReceiptCreatedEvent(savedReceipt.getId(), rmUser.getId()));
 
         ReceiptResponse receiptResponse = new ReceiptResponse();
         receiptResponse.setId(savedReceipt.getId());
