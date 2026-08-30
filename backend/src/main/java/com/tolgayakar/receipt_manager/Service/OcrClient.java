@@ -1,6 +1,8 @@
 package com.tolgayakar.receipt_manager.Service;
 
 import java.net.http.HttpClient;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -17,7 +19,8 @@ public class OcrClient {
     private final RestClient restClient;
 
     public OcrClient() {
-        // Fast api does not support HTTP/2, so we need to use HTTP/1.1 for the requests.
+        // Fast api does not support HTTP/2, so we need to use HTTP/1.1 for the
+        // requests.
         HttpClient httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .build();
@@ -46,5 +49,24 @@ public class OcrClient {
                 .body(body) // Set the request body
                 .retrieve() // Send request and retrieve the response
                 .body(OcrResponse.class); // Map the python result to OcrResponse data
+    }
+
+    public OcrResponse process(Path filePath) throws Exception {
+        byte[] fileBytes = Files.readAllBytes(filePath);
+
+        ByteArrayResource resource = new ByteArrayResource(fileBytes) {
+            @Override
+            public String getFilename() {
+                return filePath.getFileName().toString();
+            }
+        };
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", resource);
+
+        return restClient.post()
+                .uri("/ocr")
+                .body(body)
+                .retrieve()
+                .body(OcrResponse.class);
     }
 }

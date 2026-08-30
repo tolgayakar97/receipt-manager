@@ -6,7 +6,6 @@ public class ReceiptRequest {
     // In. order to get real receipt file, there is a request type: multipart/form-data.
     // MultipartFile represents the uploaded file through a multipart/form-data request.
     private MultipartFile file;
-    private String filePath;
     private String name;
     private String description;
 
@@ -16,14 +15,6 @@ public class ReceiptRequest {
 
     public void setFile(MultipartFile file) {
         this.file = file;
-    }
-
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
-
-    public String getFilePath() {
-        return filePath;
     }
 
     public void setName(String name) {

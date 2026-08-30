@@ -24,6 +24,7 @@ services:
     volumes:
       - ./backend:/app
       - maven_cache:/root/.m2
+      - uploads:/app/uploads
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -62,3 +63,4 @@ volumes:
   postgres_data:
   maven_cache:
   paddlex_cache:
+  uploads:

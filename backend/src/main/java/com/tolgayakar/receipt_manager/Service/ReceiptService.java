@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import javax.management.RuntimeErrorException;
+
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,30 +35,33 @@ public class ReceiptService {
     private final OcrClient ocrClient;
     private final RedisTemplate<String, List<ReceiptResponse>> redisTemplate;
     private final ReceiptEventProducer receiptEventProducer;
-
+    private final FileStorageService fileStorageService;
 
     public ReceiptService(ReceiptRepository receiptRepository, RmUserRepository rmUserRepository, OcrClient ocrrClient,
-        RedisTemplate<String, List<ReceiptResponse>> redisTemplate, ReceiptEventProducer receiptEventProducer
-    ) {
+            RedisTemplate<String, List<ReceiptResponse>> redisTemplate, ReceiptEventProducer receiptEventProducer,
+            FileStorageService fileStorageService) {
         this.receiptRepository = receiptRepository;
         this.rmUserRepository = rmUserRepository;
         this.ocrClient = ocrrClient;
         this.redisTemplate = redisTemplate;
         this.receiptEventProducer = receiptEventProducer;
+        this.fileStorageService = fileStorageService;
     }
 
-    public List<ReceiptResponse> getReceipts(Boolean isDeleted) throws UsernameNotFoundException, NoSuchElementException {
+    public List<ReceiptResponse> getReceipts(Boolean isDeleted)
+            throws UsernameNotFoundException, NoSuchElementException {
         RmUser rmUser = getRmUserFromAuth();
 
         String cacheKey = "receipts:user:" + rmUser.getId() + ":" + isDeleted;
 
         List<ReceiptResponse> cachedResponsesList = redisTemplate.opsForValue().get(cacheKey);
-        if(cachedResponsesList != null){
+        if (cachedResponsesList != null) {
             return cachedResponsesList;
         }
-        
+
         List<ReceiptResponse> receiptResponsesList = new ArrayList<>();
-        List<Receipt> receiptsList = receiptRepository.findByUserIdAndIsDeleted(rmUser.getId(), isDeleted).orElseThrow();
+        List<Receipt> receiptsList = receiptRepository.findByUserIdAndIsDeleted(rmUser.getId(), isDeleted)
+                .orElseThrow();
 
         for (Receipt receipt : receiptsList) {
             ReceiptResponse receiptResponse = new ReceiptResponse();
@@ -72,9 +77,11 @@ public class ReceiptService {
         return receiptResponsesList;
     }
 
-    public ReceiptResponse getReceipt(Long receiptId, Boolean isDeleted) throws UsernameNotFoundException, NoSuchElementException {
+    public ReceiptResponse getReceipt(Long receiptId, Boolean isDeleted)
+            throws UsernameNotFoundException, NoSuchElementException {
         RmUser rmUser = getRmUserFromAuth();
-        Receipt receipt = receiptRepository.findByIdAndUserIdAndIsDeleted(receiptId, rmUser.getId(), isDeleted).orElseThrow();
+        Receipt receipt = receiptRepository.findByIdAndUserIdAndIsDeleted(receiptId, rmUser.getId(), isDeleted)
+                .orElseThrow();
 
         ReceiptResponse receiptResponse = new ReceiptResponse();
         receiptResponse.setId(receipt.getId());
@@ -85,19 +92,28 @@ public class ReceiptService {
 
         return receiptResponse;
     }
-    
+
     public ReceiptResponse createReceipt(ReceiptRequest receiptRequest) throws UsernameNotFoundException {
         RmUser rmUser = getRmUserFromAuth();
-        
+
+        String filePath;
+
+        try {
+            filePath = fileStorageService.saveFile(receiptRequest.getFile());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save receipt file", e);
+        }
+
         Receipt receipt = new Receipt();
-        receipt.setFilePath(receiptRequest.getFilePath());
+        receipt.setFilePath(filePath);
         receipt.setName(receiptRequest.getName());
         receipt.setDescription(receiptRequest.getDescription());
         receipt.setDeleted(false);
         receipt.setUser(rmUser);
         Receipt savedReceipt = receiptRepository.save(receipt);
 
-        receiptEventProducer.sendReceiptCreateEvent(new ReceiptCreatedEvent(savedReceipt.getId(), rmUser.getId()));
+        receiptEventProducer.sendReceiptCreateEvent(
+                new ReceiptCreatedEvent(savedReceipt.getId(), rmUser.getId(), savedReceipt.getFilePath()));
 
         ReceiptResponse receiptResponse = new ReceiptResponse();
         receiptResponse.setId(savedReceipt.getId());
@@ -106,16 +122,15 @@ public class ReceiptService {
         receiptResponse.setDescription(savedReceipt.getDescription());
         receiptResponse.setCreatedAt(savedReceipt.getCreatedAt());
 
-        performOcr(receiptRequest.getFile(), savedReceipt);
         return receiptResponse;
     }
 
-    public ReceiptResponse putReceipt(Long id, ReceiptRequest receiptRequest) throws UsernameNotFoundException, NoSuchElementException {
+    public ReceiptResponse putReceipt(Long id, ReceiptRequest receiptRequest)
+            throws UsernameNotFoundException, NoSuchElementException {
         RmUser rmUser = getRmUserFromAuth();
         Receipt receipt = receiptRepository.findByIdAndUserIdAndIsDeleted(id, rmUser.getId(), false).orElseThrow();
         receipt.setName(receiptRequest.getName());
         receipt.setDescription(receiptRequest.getDescription());
-        receipt.setFilePath(receiptRequest.getFilePath());
         receiptRepository.save(receipt);
 
         ReceiptResponse receiptResponse = new ReceiptResponse();
@@ -138,7 +153,7 @@ public class ReceiptService {
     private RmUser getRmUserFromAuth() throws UsernameNotFoundException {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         Optional<RmUser> opt = rmUserRepository.findByEmail(auth.getName());
-         if(opt.isEmpty()) {
+        if (opt.isEmpty()) {
             throw new UsernameNotFoundException("Username not found with email: " + auth.getName());
         }
         return opt.get();
@@ -154,7 +169,7 @@ public class ReceiptService {
         }
     }
 
-    private void persistDb(Receipt receipt, ParsedReceipt parsedReceipt) {
+    public void persistDb(Receipt receipt, ParsedReceipt parsedReceipt) {
         receipt.setMerchantName(parsedReceipt.getMerchantName());
         receipt.setReceiptNumber(parsedReceipt.getReceiptNumber());
         receipt.setPurchaseDate(parsedReceipt.getPurchaseDate());
@@ -171,5 +186,11 @@ public class ReceiptService {
         }
 
         receiptRepository.save(receipt);
+    }
+
+    public Receipt getReceiptForProcessing(Long receiptId) {
+        return receiptRepository.findById(receiptId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Receipt not found: " + receiptId));
     }
 }

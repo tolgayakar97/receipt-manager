@@ -12,6 +12,7 @@ import org.hibernate.generator.EventType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -75,7 +76,8 @@ public class Receipt {
     @OneToMany(
         mappedBy = "receipt",
         cascade = CascadeType.ALL,
-        orphanRemoval = true
+        orphanRemoval = true,
+        fetch = FetchType.EAGER
     )
     private List<ReceiptItem> receiptItems = new ArrayList<>();
 
