@@ -12,7 +12,7 @@ The project is designed as a Dockerized multi-service application:
 - **Python + FastAPI** — OCR service powered by PaddleOCR
 - **React** — frontend application
 - **PostgreSQL** — persistent application data
-- **Redis** — caching / supporting infrastructure
+- **Redis** — receipt-list caching
 - **Kafka** — asynchronous event processing
 - **Docker Compose** — local development and service orchestration
 
@@ -22,6 +22,7 @@ The project is designed as a Dockerized multi-service application:
                     ┌──────────────┐
                     │    React     │
                     │    :3000     │
+                    │   planned    │
                     └──────┬───────┘
                            │
                            ▼
@@ -36,21 +37,23 @@ The project is designed as a Dockerized multi-service application:
       │ PostgreSQL  │           │    Redis    │
       │    :5433    │           │    :6379    │
       └─────────────┘           └─────────────┘
-
-                    ┌──────────────┐
-                    │ OCR Service  │
-                    │ Python +     │
-                    │ PaddleOCR    │
-                    │    :8000     │
-                    └──────────────┘
-
-                    ┌──────────────┐
-                    │    Kafka     │
-                    │    planned   │
-                    └──────────────┘
+                                      │
+                                      │ GET /receipts cache
+                                      │
+                    ┌──────────────┐  │
+                    │ OCR Service  │  │
+                    │ Python +     │  │
+                    │ PaddleOCR    │  │
+                    │    :8000     │  │
+                    └──────────────┘  │
+                                      │
+                    ┌──────────────┐  │
+                    │    Kafka     │  │
+                    │    planned   │  │
+                    └──────────────┘  │
 ```
 
-Redis is already part of the Docker Compose infrastructure, but application-level caching is not implemented yet. Kafka and React are the next major integration steps.
+Redis is now integrated into the Spring Boot application. `GET /receipts` uses a user- and deletion-state-specific Redis cache key and returns the cached `ReceiptResponse` list on a cache hit. Kafka and React are the next major integration steps.
 
 ## Current Goal — V1 MVP
 
@@ -233,13 +236,17 @@ The Spring Boot OCR client sends the receipt image as `multipart/form-data` and 
 
 ### Phase 5 — Redis
 
-- [ ] Define Redis use cases
-- [ ] Configure Spring Data Redis
-- [ ] Add receipt caching
+- [x] Define initial Redis use case — cache receipt lists returned by `GET /receipts`
+- [x] Configure Spring Data Redis
+- [x] Add receipt-list caching
 - [ ] Add cache invalidation/update behavior
-- [ ] Verify cache-backed receipt reads
+- [x] Verify cache-backed receipt reads
 
-Redis is already available as the `rm-redis` Docker Compose service. Application-level integration is the next backend task.
+Redis is available as the `rm-redis` Docker Compose service and is configured in Spring Boot with `spring.data.redis.host=redis` and port `6379`.
+
+The application uses a typed `RedisTemplate<String, List<ReceiptResponse>>` with string keys and Jackson JSON serialization for the cached receipt-response list. `GET /receipts` generates a cache key in the form `receipts:user:{userId}:{isDeleted}`. A cache hit returns the cached list directly; a cache miss loads the data from PostgreSQL and stores the result in Redis.
+
+The current Redis implementation intentionally covers the read path first. Cache invalidation for receipt creation, update and soft deletion will be added if needed after the Kafka integration is established.
 
 ### Phase 6 — Kafka
 
@@ -270,7 +277,7 @@ Redis is already available as the `rm-redis` Docker Compose service. Application
 - [ ] OCR and mock parsed result
 - [x] Persist parsed receipt and receipt items
 - [ ] Publish / consume Kafka events
-- [ ] Use Redis in the application flow
+- [x] Use Redis in the application flow
 - [ ] Display persisted receipt data in React
 - [ ] Verify the complete Dockerized flow
 
@@ -290,7 +297,7 @@ Redis is already available as the `rm-redis` Docker Compose service. Application
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot |
+| Backend | Java 21, Spring Boot 4.1.1 |
 | Authentication | Spring Security, JWT (JJWT) |
 | Database | PostgreSQL 17 |
 | ORM | Spring Data JPA / Hibernate |
@@ -322,7 +329,7 @@ The immediate development order is:
 13. ~~Spring Boot → OCR service integration~~ **Completed**
 14. ~~Structured parsed receipt contract and DTO mapping~~ **Completed (mock parser)**
 15. ~~Persist parsed receipt information and receipt items~~ **Completed**
-16. Redis integration
+16. ~~Redis integration for GET /receipts caching~~ **Completed**
 17. Kafka integration
 18. React frontend
 19. End-to-end MVP flow
