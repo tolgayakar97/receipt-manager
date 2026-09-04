@@ -1,8 +1,34 @@
-import React,{useState}from'react';import{createRoot}from'react-dom/client';import'./styles.css';
-const API='http://localhost:8080';
-function App(){const[token,setToken]=useState(localStorage.getItem('token'));const[mode,setMode]=useState('login');const[receipts,setReceipts]=useState([]);const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[name,setName]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');const[tab,setTab]=useState('active');
-async function auth(e){e.preventDefault();setBusy(true);setError('');try{const endpoint=mode==='login'?'/login':'/register';const body=mode==='login'?{email,password}:{email,password,name};const r=await fetch(API+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('Request failed');const data=await r.text();if(mode==='login'){localStorage.setItem('token',data);setToken(data)}else setMode('login')}catch(x){setError('İşlem başarısız. Backend bağlantısını kontrol et.')}finally{setBusy(false)}}
-async function load(){setError('');try{const r=await fetch(API+`/receipts?isDeleted=${tab==='trash'}`,{headers:{Authorization:`Bearer ${token}`}});if(!r.ok)throw Error();setReceipts(await r.json())}catch{x=>setError('Fişler yüklenemedi')}}
-React.useEffect(()=>{if(token)load()},[token,tab]);
-if(!token)return <main className="auth"><section className="authCard"><div className="brand">RM</div><p className="eyebrow">RECEIPT MANAGER</p><h1>{mode==='login'?'Tekrar hoş geldin.':'Hesabını oluştur.'}</h1><p className="muted">Fişlerini tek yerde sakla ve OCR ile dijitalleştir.</p><form onSubmit={auth}>{mode==='register'&&<input placeholder="Ad Soyad" value={name} onChange={e=>setName(e.target.value)}/>}<input type="email" placeholder="E-posta" value={email} onChange={e=>setEmail(e.target.value)} required/><input type="password" placeholder="Şifre" value={password} onChange={e=>setPassword(e.target.value)} required/><button disabled={busy}>{busy?'Bekle...':mode==='login'?'Giriş yap':'Kayıt ol'}</button></form>{error&&<p className="error">{error}</p>}<button className="link" onClick={()=>setMode(mode==='login'?'register':'login')}>{mode==='login'?'Hesabın yok mu? Kayıt ol':'Zaten hesabın var mı? Giriş yap'}</button></section></main>;
-return <div className="app"><aside><div className="logo">RM</div><nav><button className={tab==='active'?'selected':''} onClick={()=>setTab('active')}>◫ <span>Fişler</span></button><button className={tab==='trash'?'selected':''} onClick={()=>setTab('trash')}>⌫ <span>Çöp Kutusu</span></button></nav><button className="logout" onClick={()=>{localStorage.removeItem('token');setToken(null)}}>Çıkış</button></aside><main className="content"><header><div><p className="eyebrow">MY RECEIPTS</p><h1>{tab==='active'?'Fişlerim':'Çöp Kutusu'}</h1></div><label className="upload">+ Fiş yükle<input type="file" accept="image/*" onChange={async e=>{const file=e.target.files?.[0];if(!file)return;const fd=new FormData();fd.append('file',file);fd.append('name',file.name);fd.append('description','');try{await fetch(API+'/receipts',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});load()}catch{setError('Fiş yüklenemedi')}}}/></label></header>{error&&<p className="error">{error}</p>}<section className="grid">{receipts.map(r=><article className="receipt" key={r.id}><div className="thumb">🧾</div><div><h3>{r.name||'Fiş #' + r.id}</h3><p>{r.description||'OCR işleniyor...'}</p><small>{r.createdAt?new Date(r.createdAt).toLocaleDateString('tr-TR'):''}</small></div></article>)}{!receipts.length&&<div className="empty"><span>🧾</span><h2>Henüz fiş yok</h2><p>İlk fişini yükle, gerisini Receipt Manager halletsin.</p></div>}</section></main></div>};createRoot(document.getElementById('root')).render(<App/>);
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ReceiptsPage from './pages/ReceiptsPage';
+import ReceiptDetailPage from './pages/ReceiptDetailPage';
+import './styles.css';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route index element={<Navigate to="/receipts" replace />} />
+            <Route path="receipts" element={<ReceiptsPage />} />
+            <Route path="receipts/:id" element={<ReceiptDetailPage />} />
+            <Route path="trash" element={<ReceiptsPage isDeleted />} />
+          </Route>
+        </Route>
+        <Route path="*" element={<Navigate to="/receipts" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode><App /></React.StrictMode>,
+);
