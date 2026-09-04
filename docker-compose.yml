@@ -10,11 +10,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
   redis:
     container_name: rm-redis
     image: redis:8
     ports:
       - "6379:6379"
+
   backend:
     container_name: rm-backend
     build:
@@ -30,6 +32,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
+
   ocr:
     platform: linux/amd64
     container_name: rm-ocr
@@ -41,6 +44,7 @@ services:
       - ./ocr-service:/app
       - paddlex_cache:/root/.paddlex
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
   kafka:
     container_name: rm-kafka
     image: apache/kafka:4.0.1
@@ -58,6 +62,15 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  frontend:
+    container_name: rm-frontend
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
