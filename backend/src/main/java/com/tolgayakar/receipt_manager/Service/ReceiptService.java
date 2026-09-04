@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
-import javax.management.RuntimeErrorException;
-
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,8 +49,7 @@ public class ReceiptService {
     public List<ReceiptResponse> getReceipts(Boolean isDeleted)
             throws UsernameNotFoundException, NoSuchElementException {
         RmUser rmUser = getRmUserFromAuth();
-
-        String cacheKey = "receipts:user:" + rmUser.getId() + ":" + isDeleted;
+        String cacheKey = getCacheKey(rmUser.getId(), isDeleted);
 
         List<ReceiptResponse> cachedResponsesList = redisTemplate.opsForValue().get(cacheKey);
         if (cachedResponsesList != null) {
@@ -64,13 +61,7 @@ public class ReceiptService {
                 .orElseThrow();
 
         for (Receipt receipt : receiptsList) {
-            ReceiptResponse receiptResponse = new ReceiptResponse();
-            receiptResponse.setId(receipt.getId());
-            receiptResponse.setFilePath(receipt.getFilePath());
-            receiptResponse.setName(receipt.getName());
-            receiptResponse.setDescription(receipt.getDescription());
-            receiptResponse.setCreatedAt(receipt.getCreatedAt());
-            receiptResponsesList.add(receiptResponse);
+            receiptResponsesList.add(toReceiptResponse(receipt));
         }
 
         redisTemplate.opsForValue().set(cacheKey, receiptResponsesList);
@@ -82,22 +73,13 @@ public class ReceiptService {
         RmUser rmUser = getRmUserFromAuth();
         Receipt receipt = receiptRepository.findByIdAndUserIdAndIsDeleted(receiptId, rmUser.getId(), isDeleted)
                 .orElseThrow();
-
-        ReceiptResponse receiptResponse = new ReceiptResponse();
-        receiptResponse.setId(receipt.getId());
-        receiptResponse.setFilePath(receipt.getFilePath());
-        receiptResponse.setName(receipt.getName());
-        receiptResponse.setDescription(receipt.getDescription());
-        receiptResponse.setCreatedAt(receipt.getCreatedAt());
-
-        return receiptResponse;
+        return toReceiptResponse(receipt);
     }
 
     public ReceiptResponse createReceipt(ReceiptRequest receiptRequest) throws UsernameNotFoundException {
         RmUser rmUser = getRmUserFromAuth();
 
         String filePath;
-
         try {
             filePath = fileStorageService.saveFile(receiptRequest.getFile());
         } catch (Exception e) {
@@ -112,17 +94,12 @@ public class ReceiptService {
         receipt.setUser(rmUser);
         Receipt savedReceipt = receiptRepository.save(receipt);
 
+        invalidateReceiptCache(rmUser.getId());
+
         receiptEventProducer.sendReceiptCreateEvent(
                 new ReceiptCreatedEvent(savedReceipt.getId(), rmUser.getId(), savedReceipt.getFilePath()));
 
-        ReceiptResponse receiptResponse = new ReceiptResponse();
-        receiptResponse.setId(savedReceipt.getId());
-        receiptResponse.setFilePath(savedReceipt.getFilePath());
-        receiptResponse.setName(savedReceipt.getName());
-        receiptResponse.setDescription(savedReceipt.getDescription());
-        receiptResponse.setCreatedAt(savedReceipt.getCreatedAt());
-
-        return receiptResponse;
+        return toReceiptResponse(savedReceipt);
     }
 
     public ReceiptResponse putReceipt(Long id, ReceiptRequest receiptRequest)
@@ -133,14 +110,8 @@ public class ReceiptService {
         receipt.setDescription(receiptRequest.getDescription());
         receiptRepository.save(receipt);
 
-        ReceiptResponse receiptResponse = new ReceiptResponse();
-        receiptResponse.setId(receipt.getId());
-        receiptResponse.setFilePath(receipt.getFilePath());
-        receiptResponse.setName(receipt.getName());
-        receiptResponse.setDescription(receipt.getDescription());
-        receiptResponse.setCreatedAt(receipt.getCreatedAt());
-
-        return receiptResponse;
+        invalidateReceiptCache(rmUser.getId());
+        return toReceiptResponse(receipt);
     }
 
     public void softDeleteReceipt(Long id) throws UsernameNotFoundException, NoSuchElementException {
@@ -148,6 +119,8 @@ public class ReceiptService {
         Receipt receipt = receiptRepository.findByIdAndUserIdAndIsDeleted(id, rmUser.getId(), false).orElseThrow();
         receipt.setDeleted(true);
         receiptRepository.save(receipt);
+
+        invalidateReceiptCache(rmUser.getId());
     }
 
     private RmUser getRmUserFromAuth() throws UsernameNotFoundException {
@@ -181,16 +154,37 @@ public class ReceiptService {
             receiptItem.setQuantity(receiptItemDto.getQuantity());
             receiptItem.setUnit(receiptItemDto.getUnit());
             receiptItem.setUnitPrice(receiptItemDto.getUnitPrice());
-
             receipt.addReceiptItem(receiptItem);
         }
 
         receiptRepository.save(receipt);
+        if (receipt.getUser() != null) {
+            invalidateReceiptCache(receipt.getUser().getId());
+        }
     }
 
     public Receipt getReceiptForProcessing(Long receiptId) {
         return receiptRepository.findById(receiptId)
-                .orElseThrow(() -> new NoSuchElementException(
-                        "Receipt not found: " + receiptId));
+                .orElseThrow(() -> new NoSuchElementException("Receipt not found: " + receiptId));
     }
+
+    private String getCacheKey(Long userId, Boolean isDeleted) {
+        return "receipts:user:" + userId + ":" + isDeleted;
+    }
+
+    private void invalidateReceiptCache(Long userId) {
+        redisTemplate.delete(getCacheKey(userId, false));
+        redisTemplate.delete(getCacheKey(userId, true));
+    }
+
+    private ReceiptResponse toReceiptResponse(Receipt receipt) {
+        ReceiptResponse receiptResponse = new ReceiptResponse();
+        receiptResponse.setId(receipt.getId());
+        receiptResponse.setFilePath(receipt.getFilePath());
+        receiptResponse.setName(receipt.getName());
+        receiptResponse.setDescription(receipt.getDescription());
+        receiptResponse.setCreatedAt(receipt.getCreatedAt());
+        return receiptResponse;
+    }
+
 }
