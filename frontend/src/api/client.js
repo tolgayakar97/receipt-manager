@@ -1,12 +1,10 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiRequest(path, options = {}) {
   const token = localStorage.getItem('token');
   const headers = new Headers(options.headers || {});
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
